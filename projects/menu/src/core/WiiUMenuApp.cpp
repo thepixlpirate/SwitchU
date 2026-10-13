@@ -848,6 +848,8 @@ void WiiUMenuApp::onDestroy() {
         m_recentWidgetAssetDecode->cancelled.store(true);
     if (m_gameArtworkDecode)
         m_gameArtworkDecode->cancelled.store(true);
+    if (m_portraitDecode)
+        m_portraitDecode->cancelled.store(true);
     m_threadPool.shutdown();
 
     if (m_accessibilityFuture.valid()) {
@@ -1037,6 +1039,28 @@ void WiiUMenuApp::wireProfileLockNavigation() {
     auto* lock = m_profileLock.get();
     const bool dynamicLine = m_appLayoutMode == AppLayoutMode::DynamicLine;
     const auto& leftButtons = m_sidebar.leftButtons();
+
+    if (!m_config.homeShowProfileButton) {
+        // Hidden: nothing may navigate onto it. In the single row, UP from a
+        // game goes to the first shortcut of the top strip instead.
+        m_sidebar.setDynamicLineProfileTarget(nullptr);
+        if (!leftButtons.empty())
+            leftButtons.front()->setCustomNavigation(
+                dynamicLine ? nxui::FocusDirection::LEFT : nxui::FocusDirection::UP,
+                leftButtons.front().get());
+        if (m_grid) {
+            nxui::Widget* up = nullptr;
+            if (dynamicLine) {
+                if (!leftButtons.empty()) up = leftButtons.front().get();
+                else if (!m_sidebar.rightButtons().empty())
+                    up = m_sidebar.rightButtons().front().get();
+            }
+            m_grid->setDynamicLineUpTarget(up);
+        }
+        if (dynamicLine)
+            m_sidebar.setDynamicLineUpTarget(nullptr);
+        return;
+    }
 
     lock->setCustomNavigation(nxui::FocusDirection::LEFT, lock);
     lock->setCustomNavigation(nxui::FocusDirection::UP, lock);
@@ -1828,6 +1852,7 @@ GridModel WiiUMenuApp::buildRootFolderModel() {
             model.addEntry({});
         }
     }
+    dropHiddenTitles(model);
     if (m_appLayoutMode == AppLayoutMode::DynamicLine)
         return compactDynamicLineEntries(model);
     return model;
@@ -1904,6 +1929,7 @@ GridModel WiiUMenuApp::buildOpenFolderModel(std::uint32_t folderId) const {
         else
             model.addEntry({});
     }
+    dropHiddenTitles(model);
     if (m_appLayoutMode == AppLayoutMode::DynamicLine)
         return compactDynamicLineEntries(model);
     return model;
@@ -3217,6 +3243,7 @@ void WiiUMenuApp::configureDynamicLineNavigation() {
     if (!dynamicLine) {
         m_sidebar.setDynamicLineDownAction({});
         wireProfileLockNavigation();
+        applyBottomBarNavigation();
         return;
     }
 
@@ -3232,6 +3259,8 @@ void WiiUMenuApp::configureDynamicLineNavigation() {
         if (target && isCurrentFocusableWidget(target))
             focusManager().setFocus(target);
     });
+    // Settings > Home Screen bottom bar flips this: Settings sits below.
+    applyBottomBarNavigation();
 }
 
 void WiiUMenuApp::setAppLayoutMode(AppLayoutMode mode) {
@@ -3275,6 +3304,20 @@ void WiiUMenuApp::setAppLayoutMode(AppLayoutMode mode) {
             reattachEditSourceIcon();
     }
     configureDynamicLineNavigation();
+    if (m_grid)
+        m_grid->setLineStyle(m_config.homeLineStyle);
+    if (m_settings) {
+        // Keep Settings > Home Screen in step when the view is switched with
+        // the Minus button.
+        auto home = m_settings->homeOptionsState();
+        const bool singleRow = m_appLayoutMode == AppLayoutMode::DynamicLine;
+        if (home.singleRow != singleRow) {
+            home.singleRow = singleRow;
+            m_settings->setHomeOptionsState(home);
+            if (!m_settings->isActive())
+                m_settingsNeedRefresh = true;
+        }
+    }
 
     m_audio.playSfx(Sfx::ThemeToggle);
 
@@ -3987,6 +4030,7 @@ void WiiUMenuApp::buildGrid() {
 
     m_grid = std::make_shared<IconGrid>();
     m_grid->setRect({kGridRectX, kGridRectY, kGridRectW, kGridRectH});
+    m_grid->setLineStyle(m_config.homeLineStyle);
     m_grid->setLayoutMode(m_appLayoutMode);
     // The grid starts from IconGrid's own default (teleport), so the configured
     // mode has to be applied here too: without it the first page changes after
@@ -4223,6 +4267,10 @@ void WiiUMenuApp::buildGrid() {
             m_navigator.navigate(switchu::navigation::Route::Settings);
             if (m_themeShop && m_themeShop->isActive())
                 m_themeShop->hide();
+            // Hidden-game names are only known once the game list has loaded.
+            pushHomeOptionsToSettings();
+            if (!m_config.hiddenTitles.empty())
+                m_settings->refreshTranslations();
             m_settings->show();
             focusManager().setFocus(m_settings.get());
         }
@@ -4281,6 +4329,8 @@ void WiiUMenuApp::buildGrid() {
         focusManager().setFocus(m_themeShop.get());
     };
 
+    m_openThemeShopAction = sidebarActions.onMiiverse;
+    m_openSettingsAction = sidebarActions.onSettings;
     m_sidebar.build(app().gpu(), app().renderer(), SD_ASSETS, sidebarActions);
     configureDynamicLineNavigation();
     if (!fastReturn) {
@@ -4346,13 +4396,13 @@ void WiiUMenuApp::buildGrid() {
     m_leftSidebar = std::make_shared<nxui::Box>(nxui::Axis::COLUMN);
     m_leftSidebar->setTag("leftSidebar");
     m_leftSidebar->setWireframeEnabled(false);
-    for (auto& btn : m_sidebar.leftButtons())
+    for (auto& btn : m_sidebar.allLeftButtons())
         m_leftSidebar->addChild(btn);
 
     m_rightSidebar = std::make_shared<nxui::Box>(nxui::Axis::COLUMN);
     m_rightSidebar->setTag("rightSidebar");
     m_rightSidebar->setWireframeEnabled(false);
-    for (auto& btn : m_sidebar.rightButtons())
+    for (auto& btn : m_sidebar.allRightButtons())
         m_rightSidebar->addChild(btn);
 
     m_contentLayer->addChild(m_folderBackdrop);
@@ -4367,6 +4417,7 @@ void WiiUMenuApp::buildGrid() {
     m_contentLayer->addChild(m_topHud);
     m_contentLayer->addChild(m_titlePill);
     m_contentLayer->addChild(m_pageIndicator);
+    applyHomeChromeOptions();
 
     m_overlayLayer = std::make_shared<nxui::Box>();
     m_overlayLayer->setRect({0, 0, 1280, 720});
@@ -4977,6 +5028,8 @@ void WiiUMenuApp::onUpdateAwake(float dt) {
     // widget texture to the GPU per frame so returning HOME remains smooth.
     pollRecentWidgetAssets();
     pollGameArtworkAssets();
+    syncPortraitCovers();
+    syncPortraitTitlePlacement();
     syncFolderHeader();
 
 #ifdef NXUI_BACKEND_DEKO3D
@@ -5554,8 +5607,12 @@ void WiiUMenuApp::onUpdateAwake(float dt) {
                 else if (m_model.at(index).isWidget())
                     showWidgetOptionsMenu(m_model.at(index).widgetId,
                                           index, icon->focusRect());
-                else if (m_model.at(index).isApplication())
-                    showGameContextMenu(icon);
+                else if (m_model.at(index).isApplication()) {
+                    if (m_config.homePlusAction == 0)
+                        showQuickGameMenu(icon);
+                    else
+                        showGameContextMenu(icon);
+                }
             }
         }
     }
@@ -5575,7 +5632,10 @@ void WiiUMenuApp::onUpdateAwake(float dt) {
         !(m_controllerTest && m_controllerTest->isActive()) &&
         !(m_profileCarousel && m_profileCarousel->isActive()) &&
         !(m_userSelect && m_userSelect->isActive())) {
-        toggleAppLayoutMode();
+        if (m_config.homeMinusAction == 0)
+            showPowerMenu();
+        else
+            toggleAppLayoutMode();
     }
 
     if (m_plusExitPending) {
@@ -5885,6 +5945,12 @@ std::vector<WiiUMenuApp::ActionHint> WiiUMenuApp::buildActionHints() {
         return hints;
     }
 
+    // Minimal home screen: no hint bubbles on the HOME page itself. Every
+    // button keeps working; the hints come back with Settings > Home Screen >
+    // Button Hints. Folders and menus above still show theirs.
+    if (!m_config.homeShowButtonHints && m_openFolderId == 0)
+        return hints;
+
     if (m_openFolderId != 0)
         add(buttonGlyph(nxui::Button::B), i18n.tr("hint.back", "Back"));
     else
@@ -5958,7 +6024,9 @@ std::vector<WiiUMenuApp::ActionHint> WiiUMenuApp::buildActionHints() {
     }
 
     if (m_navigator.route() == switchu::navigation::Route::Home && !m_editMode) {
-        add(buttonGlyph(nxui::Button::Minus), i18n.tr("hint.switch_layout", "Switch view"));
+        add(buttonGlyph(nxui::Button::Minus), m_config.homeMinusAction == 0
+            ? i18n.tr("power.title", "Power")
+            : i18n.tr("hint.switch_layout", "Switch view"));
     }
 
     // Paging lives on the arrows flanking the grid, not in the capsules.

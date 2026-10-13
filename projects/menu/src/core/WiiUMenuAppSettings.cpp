@@ -271,6 +271,10 @@ void WiiUMenuApp::createSettings() {
     m_settings->onSliderSfx([this](bool up) {
         m_audio.playSfx(up ? Sfx::SliderUp : Sfx::SliderDown);
     });
+    pushHomeOptionsToSettings();
+    m_settings->onHomeOptionChange([this](const std::string& key, int value) {
+        applyHomeOption(key, value);
+    });
     m_settings->onWireframeChange([this](bool enabled) {
         m_showWireframe = enabled;
         app().renderer().setBoxWireframeEnabled(enabled);
@@ -524,6 +528,14 @@ void WiiUMenuApp::createSettings() {
         // SteamGridDB toggles / scans may have changed what artwork exists while
         // the overlay owned focus; re-evaluate the hero once the menu is back.
         showFocusedSteamGridDbArtwork(true);
+        if (m_homeRebuildPending) {
+            m_homeRebuildPending = false;
+            if (m_openFolderId == 0)
+                applyDisplayModel(buildRootFolderModel(), 0, false);
+        }
+        // Themes opened from inside Settings already own focus.
+        if (m_themeShop && m_themeShop->isActive())
+            return;
         if (isCurrentFocusableWidget(m_sidebar.settingsButton())) {
             m_suppressNextNavigateSfx = true;
             focusManager().setFocus(m_sidebar.settingsButton());
@@ -1713,6 +1725,10 @@ void WiiUMenuApp::createThemeShop() {
         if (isCurrentFocusableWidget(m_sidebar.themeShopButton())) {
             m_suppressNextNavigateSfx = true;
             focusManager().setFocus(m_sidebar.themeShopButton());
+        } else if (m_grid && m_navigator.route() == switchu::navigation::Route::Home) {
+            // The Themes shortcut is hidden: go back to the games.
+            if (auto* target = m_grid->focusManager().current())
+                focusManager().setFocus(target);
         }
     });
 

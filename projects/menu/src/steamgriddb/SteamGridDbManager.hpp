@@ -101,6 +101,8 @@ public:
     static std::string heroPath(std::uint64_t titleId);
     static std::string logoPath(std::uint64_t titleId);
     static std::string iconPath(std::uint64_t titleId);
+    // Tall 2:3 cover (SteamGridDB "grid", 600x900) for the portrait home row.
+    static std::string portraitPath(std::uint64_t titleId);
     static bool hasArtwork(std::uint64_t titleId);
 
 private:

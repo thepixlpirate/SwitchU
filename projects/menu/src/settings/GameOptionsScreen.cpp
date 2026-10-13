@@ -59,6 +59,33 @@ void GameOptionsScreen::buildTabs() {
     Tab data;
     data.name = i18n.tr("game.data_management", "Data Management");
 
+    if (!m_game.coverLabels.empty()) {
+        SettingItem cover;
+        cover.label = i18n.tr("game.cover", "Cover");
+        cover.description = i18n.tr("game.cover_desc",
+            "The picture shown for this game on the Home screen.");
+        cover.type = ItemType::Selector;
+        cover.options = m_game.coverLabels;
+        cover.intVal = std::clamp(m_game.coverIndex, 0, (int)m_game.coverLabels.size() - 1);
+        cover.onChange = [this](SettingItem& self) {
+            m_game.coverIndex = self.intVal;
+            if (m_coverSelectCb) m_coverSelectCb(self.intVal);
+        };
+        data.items.push_back(std::move(cover));
+    }
+
+    if (m_game.canHide) {
+        SettingItem hide;
+        hide.label = i18n.tr("game.hide", "Hide from Home");
+        hide.buttonLabel = i18n.tr("button.hide", "Hide");
+        hide.description = i18n.tr("game.hide_desc",
+            "Removes the game from the Home screen without deleting it. "
+            "Bring it back in Settings > Home Screen > Hidden Games.");
+        hide.type = ItemType::Action;
+        hide.onChange = [this](SettingItem&) { if (m_hideCb) m_hideCb(); };
+        data.items.push_back(std::move(hide));
+    }
+
     if (m_game.canMove) {
         SettingItem move;
         move.label = i18n.tr("game.move_title", "Move software");

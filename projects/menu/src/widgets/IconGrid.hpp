@@ -35,6 +35,18 @@ public:
     bool isDynamicLine() const { return m_layoutMode == AppLayoutMode::DynamicLine; }
     bool isDynamicLineScrolling() const;
     bool isLayoutMorphing() const { return m_layoutMorphing; }
+    // Single-row look: 0 = Wii U carousel, 1 = portrait shelf (focus on the
+    // left), 2 = portrait, focus centred with half-size neighbours.
+    void setLineStyle(int style);
+    // Centred style: how many covers are on screen (3 or 5) and whether the
+    // clock/battery bar sits at the bottom (frees the top for bigger covers).
+    void setCenteredLayout(int coversShown, bool barAtBottom);
+    int  lineStyle() const { return m_lineStyle; }
+    bool isPortraitLine() const {
+        return m_layoutMode == AppLayoutMode::DynamicLine && m_lineStyle >= 1;
+    }
+    // Where the focused portrait card rests (for placing the game name).
+    nxui::Rect portraitFocusRestRect() const;
     void setDynamicLineUpTarget(nxui::Widget* target);
     void setDynamicLineDownTarget(nxui::Widget* target);
 
@@ -94,6 +106,7 @@ protected:
 private:
     void layoutPage();
     void layoutLine();
+    void syncIconStyles();
     void positionPage(int page, float dx);
     void renderPageAt(nxui::Renderer& ren, int page, float dx);
     void renderDynamicLine(nxui::Renderer& ren);
@@ -130,6 +143,12 @@ private:
     nxui::FocusManager m_focus;
 
     AppLayoutMode m_layoutMode = AppLayoutMode::Grid;
+    int m_lineStyle = 0;
+    int m_centerShown = 5;
+    bool m_centerBarBottom = true;
+    struct CenteredMetrics { float cardW, cardH, centerY, gap; };
+    CenteredMetrics centeredMetrics() const;
+    float centeredOffsetX(float d) const;
     nxui::AnimatedFloat m_lineScrollOffset{0.f};
     // 0 = grid geometry (usual), 1 = carousel geometry (single row)
     nxui::AnimatedFloat m_layoutMorph{0.f};

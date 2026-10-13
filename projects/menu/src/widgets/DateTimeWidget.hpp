@@ -17,13 +17,23 @@ public:
     void setSecondaryTextColor(const nxui::Color& c) { m_secondaryColor = c; }
     void setClockService(switchu::services::ClockService* service) { m_clockService = service; }
     void setUse12HourClock(bool enabled);
+    void setShowDate(bool show) { m_showDate = show; }
+
+    // Off draws only the text/icon, with no glass bubble behind it.
+    void setBubbleVisible(bool visible) { m_bubbleVisible = visible; }
 
 protected:
+    void onRender(nxui::Renderer& ren) override {
+        if (m_bubbleVisible) nxui::GlassWidget::onRender(ren);
+        else onContentRender(ren);
+    }
     void onContentUpdate(float dt) override;
     void onContentRender(nxui::Renderer& ren) override;
     nxui::Vec2 computeContentSize() const override;
 
 private:
+    bool m_bubbleVisible = true;
+    bool m_showDate = true;
     nxui::Font* m_font = nullptr;
     nxui::Font* m_smallFont = nullptr;
     float m_timer = 0.f;

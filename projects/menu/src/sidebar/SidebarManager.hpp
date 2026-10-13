@@ -32,6 +32,30 @@ public:
 
     void update(float dt, nxui::Widget* focusedWidget);
 
+    // Hide individual shortcuts. Hidden buttons stay alive (other code may
+    // still hold a pointer) but are invisible, unfocusable and left out of
+    // leftButtons()/rightButtons(). Call configure*Navigation afterwards.
+    struct Visibility {
+        bool homebrew = true;     // Album / homebrew
+        bool miiEditor = true;
+        bool settings = true;
+        bool controllers = true;
+        bool sleep = true;
+        bool themes = true;
+        bool allShown() const {
+            return homebrew && miiEditor && settings && controllers && sleep && themes;
+        }
+    };
+    void setButtonVisibility(const Visibility& visibility);
+    // Horizontal centre of the trimmed top strip (single-row layout).
+    void setCompactStripCenterX(float x) { m_compactCenterX = x; }
+    void setCompactStripY(float y) { m_compactY = y; }
+    // UP on a strip button (used when the strip sits below the games).
+    void setDynamicLineUpAction(std::function<void()> action);
+    // Every button, hidden ones included (for adding to the widget tree).
+    const std::vector<std::shared_ptr<AppletButton>>& allLeftButtons() const  { return m_allLeft; }
+    const std::vector<std::shared_ptr<AppletButton>>& allRightButtons() const { return m_allRight; }
+
     // The dynamic-line HOME layout turns the two side columns into one
     // horizontal control strip between the profile bar and the applications.
     void setDynamicLineLayout(bool enabled);
@@ -61,6 +85,16 @@ private:
     std::vector<nxui::Texture> m_icons;
     std::vector<std::shared_ptr<AppletButton>> m_leftButtons;
     std::vector<std::shared_ptr<AppletButton>> m_rightButtons;
+    std::vector<std::shared_ptr<AppletButton>> m_allLeft;
+    std::vector<std::shared_ptr<AppletButton>> m_allRight;
+    AppletButton* m_miiEditorButton = nullptr;
+    AppletButton* m_controllersButton = nullptr;
+    AppletButton* m_sleepButton = nullptr;
+    Visibility m_visibility;
+    float m_compactCenterX = 640.f;
+    float m_compactY = 18.f;
+    bool isShown(const AppletButton* button) const;
+    void placeColumns();
     AppletButton*  m_albumButton    = nullptr;
     nxui::Widget*  m_settingsButton = nullptr;
     nxui::Widget*  m_themeShopButton = nullptr;

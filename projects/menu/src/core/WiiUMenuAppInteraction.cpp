@@ -1466,7 +1466,33 @@ void WiiUMenuApp::showGameContextMenu(GlossyIcon* icon) {
     game.gameCard = icon->isGameCard();
     game.suspended = m_launcher.isAppSuspended(titleId);
     game.canMove = m_openFolderId == 0;
-    game.canResize = m_openFolderId == 0;
+    // Tile sizes only mean something on the grid.
+    game.canResize = m_openFolderId == 0 && m_appLayoutMode == AppLayoutMode::Grid;
+    game.canHide = true;
+    {
+        // Cover picker: Automatic, every image found for this game, then the
+        // plain square icon.
+        m_gameOptionsCoverPaths = coverCandidates(titleId, title);
+        game.coverLabels.push_back(i18n.tr("game.cover_auto", "Automatic"));
+        for (const auto& path : m_gameOptionsCoverPaths) {
+            std::string label = std::filesystem::path(path).filename().string();
+            const auto parent = std::filesystem::path(path).parent_path().filename().string();
+            if (label == "portrait.img") label = "SteamGridDB";
+            else if (!parent.empty() && parent != "iconswap" && parent != "portraits")
+                label = parent + "/" + label;
+            game.coverLabels.push_back(label);
+        }
+        game.coverLabels.push_back(i18n.tr("game.cover_icon", "Original Icon"));
+        const std::string choice = m_config.coverChoiceFor(titleId);
+        game.coverIndex = 0;
+        if (choice == "icon") {
+            game.coverIndex = static_cast<int>(game.coverLabels.size()) - 1;
+        } else if (!choice.empty()) {
+            for (std::size_t i = 0; i < m_gameOptionsCoverPaths.size(); ++i)
+                if (m_gameOptionsCoverPaths[i] == choice)
+                    game.coverIndex = static_cast<int>(i) + 1;
+        }
+    }
     const auto currentSize = gameGridSize(titleId, AppLayoutMode::Grid);
     game.sizeIndex = currentSize == switchu::widgets::WidgetSize{2, 2}
         ? 2 : (currentSize == switchu::widgets::WidgetSize{2, 1} ? 1 : 0);
@@ -1520,6 +1546,25 @@ void WiiUMenuApp::showGameContextMenu(GlossyIcon* icon) {
                 }, true},
             }, 0, {});
         focusManager().setFocus(m_dialog.get());
+    });
+    m_gameOptions->onHide([this, titleId]() {
+        if (m_gameOptions) m_gameOptions->hide();
+        m_navigator.resetToHome();
+        hideTitle(titleId);
+        m_audio.playSfx(Sfx::Activate);
+    });
+    m_gameOptions->onCoverSelect([this, titleId](int index) {
+        const int count = static_cast<int>(m_gameOptionsCoverPaths.size());
+        std::string choice;
+        if (index >= 1 && index <= count)
+            choice = m_gameOptionsCoverPaths[static_cast<std::size_t>(index - 1)];
+        else if (index == count + 1)
+            choice = "icon";
+        m_config.setCoverChoice(titleId, choice);
+        if (m_configSaveFuture.valid())
+            m_configSaveFuture.wait();
+        m_configSaveFuture = m_threadPool.submit([config = m_config]() { config.save(); });
+        reloadCover(titleId);
     });
     m_gameOptions->onSelectArtwork([this](GameOptionsScreen::ArtworkKind kind) {
         openSteamGridDbPicker(kind);
@@ -1682,7 +1727,8 @@ void WiiUMenuApp::handleTouch() {
     auto& input = app().input();
 
     auto hitProfileLock = [this](float x, float y) {
-        return m_profileLock && m_profileLock->isVisible() && m_profileLock->hitTest(x, y);
+        return m_profileLock && m_config.homeShowProfileButton
+            && m_profileLock->isVisible() && m_profileLock->hitTest(x, y);
     };
 
     auto focusTouchedIcon = [this](int localHit) -> GlossyIcon* {
@@ -1976,7 +2022,20 @@ void WiiUMenuApp::updateCursor() {
         // directly avoids a second easing curve that would visibly lag behind.
         const bool carouselScrolling = movingLineFocus
                                     && (morphing || m_grid->isDynamicLineScrolling());
-        m_cursor->moveTo(fr.expanded(4.f), carouselScrolling ? 0.f : 0.2f);
+        const bool portrait = m_grid && m_grid->isPortraitLine() && !m_editMode;
+        m_cursor->setPlainStyle(portrait);
+        if (portrait) {
+            // Switch look: a solid purple frame hugging the cover.
+            m_cursor->setColor(nxui::Color(0.48f, 0.12f, 0.66f, 1.f));
+            m_cursor->setBorderWidth(6.f);
+            m_cursor->moveTo(fr.expanded(movingLineFocus ? 6.f : 4.f),
+                             movingLineFocus ? 23.f : 18.f,
+                             carouselScrolling ? 0.f : 0.2f);
+        } else {
+            m_cursor->setColor(nxui::Color(0.f, 0.75f, 1.f, 1.f));
+            m_cursor->setBorderWidth(3.f);
+            m_cursor->moveTo(fr.expanded(4.f), 18.f, carouselScrolling ? 0.f : 0.2f);
+        }
         m_cursor->setVisible(true);
     } else {
         m_cursor->setVisible(false);

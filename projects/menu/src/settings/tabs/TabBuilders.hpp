@@ -54,6 +54,11 @@ public:
     static SettingsScreen::Tab build(SettingsScreen& screen);
 };
 
+class HomeScreenTab {
+public:
+    static SettingsScreen::Tab build(SettingsScreen& screen);
+};
+
 class AboutTab {
 public:
     static SettingsScreen::Tab build(SettingsScreen& screen);

@@ -51,6 +51,12 @@ void DateTimeWidget::onContentRender(nxui::Renderer& ren) {
     nxui::Font* sf = m_smallFont ? m_smallFont : m_font;
 
     nxui::Vec2 timeSz = m_font->measure(m_timeStr);
+    if (!m_showDate) {
+        ren.drawText(m_timeStr, {cr.x + (cr.width - timeSz.x) * 0.5f,
+                                 cr.y + (cr.height - timeSz.y) * 0.5f},
+                     m_font, m_textColor.withAlpha(m_opacity), 1.f);
+        return;
+    }
     nxui::Vec2 dateSz = sf->measure(m_dateStr);
     float contentH = timeSz.y + 2.f + dateSz.y * 0.7f;
     float tx = cr.x + (cr.width - timeSz.x) * 0.5f;

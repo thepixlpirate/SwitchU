@@ -2,6 +2,7 @@
 #include "core/DebugLog.hpp"
 #include <nxui/core/I18n.hpp>
 #include <nxui/core/Input.hpp>
+#include <algorithm>
 #include <filesystem>
 #include <system_error>
 
@@ -48,6 +49,11 @@ void SidebarManager::build(nxui::GpuDevice& gpu, nxui::Renderer& ren,
     m_settingsButton = nullptr;
     m_themeShopButton = nullptr;
     m_albumButton    = nullptr;
+    m_miiEditorButton = nullptr;
+    m_controllersButton = nullptr;
+    m_sleepButton = nullptr;
+    m_allLeft.clear();
+    m_allRight.clear();
     m_anims.clear();
     m_icons.clear();
     m_icons.resize(kSidebarIconCount);
@@ -73,6 +79,7 @@ void SidebarManager::build(nxui::GpuDevice& gpu, nxui::Renderer& ren,
         m_leftButtons.push_back(std::move(album));
 
         auto miiEditor = makeBtn(&m_icons[1], "sidebar.mii_editor", "Mii Editor", actions.onMiiEditor);
+        m_miiEditorButton = miiEditor.get();
         miiEditor->setRect({leftX, startY + 1.f * (btnSize + gap), btnSize, btnSize});
         m_leftButtons.push_back(std::move(miiEditor));
 
@@ -84,10 +91,12 @@ void SidebarManager::build(nxui::GpuDevice& gpu, nxui::Renderer& ren,
 
     {
         auto ctrl = makeBtn(&m_icons[2], "sidebar.controllers", "Controllers", actions.onControllers);
+        m_controllersButton = ctrl.get();
         ctrl->setRect({rightX, startY + 0.f * (btnSize + gap), btnSize, btnSize});
         m_rightButtons.push_back(std::move(ctrl));
 
         auto sleep = makeBtn(&m_icons[3], "sidebar.sleep", "Sleep", actions.onSleep);
+        m_sleepButton = sleep.get();
         sleep->setRect({rightX, startY + 1.f * (btnSize + gap), btnSize, btnSize});
         m_rightButtons.push_back(std::move(sleep));
 
@@ -97,14 +106,9 @@ void SidebarManager::build(nxui::GpuDevice& gpu, nxui::Renderer& ren,
         m_rightButtons.push_back(std::move(themeShop));
     }
 
-    if (!m_leftButtons.empty()) {
-        m_leftButtons.front()->setCustomNavigation(nxui::FocusDirection::UP, m_leftButtons.front().get());
-        m_leftButtons.back()->setCustomNavigation(nxui::FocusDirection::DOWN, m_leftButtons.back().get());
-    }
-    if (!m_rightButtons.empty()) {
-        m_rightButtons.front()->setCustomNavigation(nxui::FocusDirection::UP, m_rightButtons.front().get());
-        m_rightButtons.back()->setCustomNavigation(nxui::FocusDirection::DOWN, m_rightButtons.back().get());
-    }
+    m_allLeft = m_leftButtons;
+    m_allRight = m_rightButtons;
+    setButtonVisibility(m_visibility);
 
     (void)gpu;
     (void)ren;
@@ -123,6 +127,26 @@ void SidebarManager::setDynamicLineLayout(bool enabled) {
         button->setCustomNavigation(nxui::FocusDirection::RIGHT, nullptr);
         button->setCustomNavigation(nxui::FocusDirection::UP, nullptr);
         button->setCustomNavigation(nxui::FocusDirection::DOWN, nullptr);
+    }
+
+    if (enabled && !m_visibility.allShown()) {
+        // Trimmed shortcut set: a small row centred at the top of the screen
+        // (a lone Settings button sits in the top middle).
+        constexpr float kSize = 46.f;
+        constexpr float kGap = 12.f;
+        const float total = static_cast<float>(ordered.size()) * kSize
+                          + static_cast<float>(ordered.size() - 1) * kGap;
+        const float startX = m_compactCenterX - total * 0.5f;
+        for (std::size_t i = 0; i < ordered.size(); ++i) {
+            auto* button = ordered[i];
+            button->setRect({startX + static_cast<float>(i) * (kSize + kGap), m_compactY,
+                             kSize, kSize});
+            button->setCustomNavigation(nxui::FocusDirection::LEFT,
+                                        i > 0 ? ordered[i - 1] : button);
+            button->setCustomNavigation(nxui::FocusDirection::RIGHT,
+                                        i + 1 < ordered.size() ? ordered[i + 1] : button);
+        }
+        return;
     }
 
     if (enabled) {
@@ -144,21 +168,7 @@ void SidebarManager::setDynamicLineLayout(bool enabled) {
         return;
     }
 
-    const float totalH = 3.f * kSidebarButtonSize + 2.f * kSidebarColumnGap;
-    const float startY = 360.f - totalH * 0.5f;
-    const float rightX = 1280.f - kSidebarMarginX - kSidebarButtonSize;
-    for (std::size_t i = 0; i < m_leftButtons.size(); ++i) {
-        m_leftButtons[i]->setRect({kSidebarMarginX,
-                                   startY + static_cast<float>(i) *
-                                       (kSidebarButtonSize + kSidebarColumnGap),
-                                   kSidebarButtonSize, kSidebarButtonSize});
-    }
-    for (std::size_t i = 0; i < m_rightButtons.size(); ++i) {
-        m_rightButtons[i]->setRect({rightX,
-                                    startY + static_cast<float>(i) *
-                                        (kSidebarButtonSize + kSidebarColumnGap),
-                                    kSidebarButtonSize, kSidebarButtonSize});
-    }
+    placeColumns();
     if (!m_leftButtons.empty()) {
         m_leftButtons.front()->setCustomNavigation(nxui::FocusDirection::UP,
                                                    m_leftButtons.front().get());
@@ -173,6 +183,69 @@ void SidebarManager::setDynamicLineLayout(bool enabled) {
     }
 }
 
+void SidebarManager::placeColumns() {
+    // Each side column stays vertically centred for however many buttons it
+    // currently shows.
+    const float rightX = 1280.f - kSidebarMarginX - kSidebarButtonSize;
+    auto place = [](std::vector<std::shared_ptr<AppletButton>>& column, float x) {
+        const float count = static_cast<float>(column.size());
+        const float totalH = count * kSidebarButtonSize
+                           + std::max(0.f, count - 1.f) * kSidebarColumnGap;
+        const float startY = 360.f - totalH * 0.5f;
+        for (std::size_t i = 0; i < column.size(); ++i) {
+            column[i]->setRect({x,
+                                startY + static_cast<float>(i) *
+                                    (kSidebarButtonSize + kSidebarColumnGap),
+                                kSidebarButtonSize, kSidebarButtonSize});
+        }
+    };
+    place(m_leftButtons, kSidebarMarginX);
+    place(m_rightButtons, rightX);
+}
+
+bool SidebarManager::isShown(const AppletButton* button) const {
+    if (!button) return false;
+    if (button == m_albumButton) return m_visibility.homebrew;
+    if (button == m_miiEditorButton) return m_visibility.miiEditor;
+    if (button == m_settingsButton) return m_visibility.settings;
+    if (button == m_controllersButton) return m_visibility.controllers;
+    if (button == m_sleepButton) return m_visibility.sleep;
+    if (button == m_themeShopButton) return m_visibility.themes;
+    return true;
+}
+
+void SidebarManager::setButtonVisibility(const Visibility& visibility) {
+    m_visibility = visibility;
+    auto filter = [this](const std::vector<std::shared_ptr<AppletButton>>& all,
+                         std::vector<std::shared_ptr<AppletButton>>& shown) {
+        shown.clear();
+        for (const auto& button : all) {
+            const bool hidden = !isShown(button.get());
+            button->setVisible(!hidden);
+            button->setFocusable(!hidden);
+            if (hidden) {
+                button->setCustomNavigation(nxui::FocusDirection::LEFT, nullptr);
+                button->setCustomNavigation(nxui::FocusDirection::RIGHT, nullptr);
+                button->setCustomNavigation(nxui::FocusDirection::UP, nullptr);
+                button->setCustomNavigation(nxui::FocusDirection::DOWN, nullptr);
+            } else {
+                shown.push_back(button);
+            }
+        }
+    };
+    filter(m_allLeft, m_leftButtons);
+    filter(m_allRight, m_rightButtons);
+    placeColumns();
+    if (!m_leftButtons.empty()) {
+        m_leftButtons.front()->setCustomNavigation(nxui::FocusDirection::UP, m_leftButtons.front().get());
+        m_leftButtons.back()->setCustomNavigation(nxui::FocusDirection::DOWN, m_leftButtons.back().get());
+    }
+    if (!m_rightButtons.empty()) {
+        m_rightButtons.front()->setCustomNavigation(nxui::FocusDirection::UP, m_rightButtons.front().get());
+        m_rightButtons.back()->setCustomNavigation(nxui::FocusDirection::DOWN, m_rightButtons.back().get());
+    }
+}
+
 void SidebarManager::setDynamicLineDownAction(std::function<void()> action) {
     auto configure = [&action](std::shared_ptr<AppletButton>& button) {
         button->setCustomNavigation(nxui::FocusDirection::DOWN, nullptr);
@@ -181,6 +254,20 @@ void SidebarManager::setDynamicLineDownAction(std::function<void()> action) {
         button->removeAction(static_cast<uint64_t>(nxui::Button::RStickD));
         if (action)
             button->addDirectionAction(nxui::FocusDirection::DOWN, action);
+    };
+    for (auto& button : m_leftButtons) configure(button);
+    for (auto& button : m_rightButtons) configure(button);
+}
+
+void SidebarManager::setDynamicLineUpAction(std::function<void()> action) {
+    auto configure = [&action](std::shared_ptr<AppletButton>& button) {
+        button->removeAction(static_cast<uint64_t>(nxui::Button::DUp));
+        button->removeAction(static_cast<uint64_t>(nxui::Button::LStickU));
+        button->removeAction(static_cast<uint64_t>(nxui::Button::RStickU));
+        if (action) {
+            button->setCustomNavigation(nxui::FocusDirection::UP, nullptr);
+            button->addDirectionAction(nxui::FocusDirection::UP, action);
+        }
     };
     for (auto& button : m_leftButtons) configure(button);
     for (auto& button : m_rightButtons) configure(button);
@@ -203,7 +290,7 @@ void SidebarManager::setDynamicLineProfileTarget(nxui::Widget* profile) {
 void SidebarManager::reloadAssets(nxui::GpuDevice& gpu, nxui::Renderer& ren,
                                   const std::string& assetsBase,
                                   const std::string& customIconsBase) {
-    if (m_leftButtons.empty() || m_rightButtons.empty())
+    if (m_allLeft.empty() || m_allRight.empty())
         return;
 
     if (m_assetsLoaded
@@ -284,12 +371,12 @@ void SidebarManager::loadAssets(nxui::GpuDevice& gpu, nxui::Renderer& ren,
 
     for (const auto& def : animDefs) {
         AppletButton* btn = nullptr;
-        if (def.iconIdx == 0) btn = m_leftButtons[0].get();
-        else if (def.iconIdx == 1) btn = m_leftButtons[1].get();
-        else if (def.iconIdx == 2) btn = m_rightButtons[0].get();
-        else if (def.iconIdx == 3) btn = m_rightButtons[1].get();
-        else if (def.iconIdx == 4) btn = m_rightButtons[2].get();
-        else if (def.iconIdx == 5) btn = m_leftButtons[2].get();
+        if (def.iconIdx == 0) btn = m_allLeft[0].get();
+        else if (def.iconIdx == 1) btn = m_allLeft[1].get();
+        else if (def.iconIdx == 2) btn = m_allRight[0].get();
+        else if (def.iconIdx == 3) btn = m_allRight[1].get();
+        else if (def.iconIdx == 4) btn = m_allRight[2].get();
+        else if (def.iconIdx == 5) btn = m_allLeft[2].get();
         if (!btn)
             continue;
 
@@ -348,6 +435,6 @@ void SidebarManager::applyTheme(const nxui::Theme& theme) {
         btn->setBlurEnabled(false);
         btn->setBorderWidth(2.2f);
     };
-    for (auto& btn : m_leftButtons)  apply(btn);
-    for (auto& btn : m_rightButtons) apply(btn);
+    for (auto& btn : m_allLeft)  apply(btn);
+    for (auto& btn : m_allRight) apply(btn);
 }

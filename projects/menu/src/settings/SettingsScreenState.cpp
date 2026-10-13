@@ -8,6 +8,7 @@
 void SettingsScreen::buildTabs() {
     auto& i18n = nxui::I18n::instance();
     m_tabs = {
+        {.name = i18n.tr("settings.tabs.home_screen", "Home Screen")},
         {.name = i18n.tr("settings.tabs.system", "System")},
         {.name = i18n.tr("settings.tabs.accessibility", "Accessibility")},
         {.name = i18n.tr("settings.tabs.storage", "Storage")},
@@ -46,7 +47,7 @@ void SettingsScreen::ensureTabLoaded(int tabIndex) {
     if (m_loadingTabs[static_cast<std::size_t>(tabIndex)])
         return;
 
-    if (tabIndex == 8 && !bluetooth::IsAvailable()) {
+    if (tabIndex == 9 && !bluetooth::IsAvailable()) {
         bluetooth::Initialize();
         DebugLog::log("[settings] Bluetooth audio manager initialized on demand");
     }
@@ -57,17 +58,18 @@ void SettingsScreen::ensureTabLoaded(int tabIndex) {
 
 SettingsScreen::Tab SettingsScreen::buildTabNow(int tabIndex) {
     switch (tabIndex) {
-        case 0: return settings::tabs::SystemTab::build(*this);
-        case 1: return settings::tabs::AccessibilityTab::build(*this);
-        case 2: return settings::tabs::StorageTab::build(*this);
-        case 3: return settings::tabs::AudioTab::build(*this);
-        case 4: return settings::tabs::DisplayTab::build(*this);
-        case 5: return settings::tabs::InternetTab::build(*this);
-        case 6: return settings::tabs::SteamGridDbTab::build(*this);
-        case 7: return settings::tabs::ControllersTab::build(*this);
-        case 8: return settings::tabs::BluetoothTab::build(*this);
-        case 9: return settings::tabs::SleepTab::build(*this);
-        case 10: return settings::tabs::AboutTab::build(*this);
+        case 0: return settings::tabs::HomeScreenTab::build(*this);
+        case 1: return settings::tabs::SystemTab::build(*this);
+        case 2: return settings::tabs::AccessibilityTab::build(*this);
+        case 3: return settings::tabs::StorageTab::build(*this);
+        case 4: return settings::tabs::AudioTab::build(*this);
+        case 5: return settings::tabs::DisplayTab::build(*this);
+        case 6: return settings::tabs::InternetTab::build(*this);
+        case 7: return settings::tabs::SteamGridDbTab::build(*this);
+        case 8: return settings::tabs::ControllersTab::build(*this);
+        case 9: return settings::tabs::BluetoothTab::build(*this);
+        case 10: return settings::tabs::SleepTab::build(*this);
+        case 11: return settings::tabs::AboutTab::build(*this);
         default: break;
     }
 

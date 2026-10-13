@@ -1,6 +1,7 @@
 #include "TitlePillWidget.hpp"
 #include <nxui/core/Renderer.hpp>
 #include <algorithm>
+#include <cmath>
 
 namespace {
 
@@ -36,7 +37,20 @@ TitlePillWidget::TitlePillWidget() {
 void TitlePillWidget::onRender(nxui::Renderer& ren) {
     if (m_rect.width <= 0.5f || m_rect.height <= 0.5f)
         return;
-    nxui::GlassWidget::onRender(ren);
+    if (m_bubbleVisible)
+        nxui::GlassWidget::onRender(ren);
+    else
+        onContentRender(ren);
+}
+
+void TitlePillWidget::setAnchorCenterX(float x) {
+    if (std::abs(m_anchorCenterX - x) < 0.5f)
+        return;
+    m_anchorCenterX = x;
+    if (!m_layoutInitialized)
+        return;
+    const float w = m_animW.target();
+    m_animX.set(centerFor(1280.f) - w * 0.5f, 0.22f, nxui::Easing::outCubic);
 }
 
 void TitlePillWidget::setText(const std::string& text, float screenWidth) {
@@ -52,7 +66,7 @@ void TitlePillWidget::setText(const std::string& text, float screenWidth) {
     sizeToFit();
     setCornerRadius(m_rect.height * 0.5f);
     float targetW = m_rect.width;
-    float targetX = (screenWidth - targetW) * 0.5f;
+    float targetX = centerFor(screenWidth) - targetW * 0.5f;
 
     if (!m_layoutInitialized) {
         m_layoutInitialized = true;
@@ -62,7 +76,7 @@ void TitlePillWidget::setText(const std::string& text, float screenWidth) {
         if (!wasVisible) {
             float seedW = std::min(targetW, 54.f);
             m_animW.setImmediate(seedW);
-            m_animX.setImmediate((screenWidth - seedW) * 0.5f);
+            m_animX.setImmediate(centerFor(screenWidth) - seedW * 0.5f);
         }
         m_animX.set(targetX, 0.22f, nxui::Easing::outCubic);
         m_animW.set(targetW, 0.22f, nxui::Easing::outCubic);
@@ -85,9 +99,9 @@ void TitlePillWidget::hideAnimated(float screenWidth) {
 
     const float seedW = std::max(0.f, m_animW.value());
     m_animW.set(seedW, 0.01f, nxui::Easing::outCubic);
-    m_animX.set((screenWidth - seedW) * 0.5f, 0.01f, nxui::Easing::outCubic);
+    m_animX.set(centerFor(screenWidth) - seedW * 0.5f, 0.01f, nxui::Easing::outCubic);
     m_animW.set(0.f, 0.18f, nxui::Easing::outCubic);
-    m_animX.set(screenWidth * 0.5f, 0.18f, nxui::Easing::outCubic);
+    m_animX.set(centerFor(screenWidth), 0.18f, nxui::Easing::outCubic);
     m_textReveal.set(0.f, 0.12f, nxui::Easing::outCubic);
     m_hideOnCollapse = true;
     setVisible(true);

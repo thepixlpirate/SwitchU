@@ -13,6 +13,9 @@ public:
     void setColor(const nxui::Color& c) { m_color = c; }
     void setCornerRadius(float r)  { m_cornerRadius.setImmediate(r); }
     void setBorderWidth(float w)   { m_borderWidth = w; }
+    // Flat outline only (no glow, no inner highlight) - the Switch look.
+    void setPlainStyle(bool plain) { m_plainStyle = plain; }
+    bool plainStyle() const { return m_plainStyle; }
     void setMotionPaused(bool paused) { m_motionPaused = paused; }
     bool motionPaused() const { return m_motionPaused; }
     void setInstantMotion(bool instant);
@@ -29,6 +32,7 @@ private:
     nxui::AnimatedFloat m_cornerRadius;
     nxui::Color m_color {0.f, 0.75f, 1.f, 1.f};
     float m_borderWidth  = 3.f;
+    bool  m_plainStyle   = false;
     float m_time = 0.f;
     float m_waveSpeed = 3.5f;
     bool  m_initialized = false;

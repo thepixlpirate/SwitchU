@@ -15,6 +15,10 @@ public:
 
     void setText(const std::string& text, float screenWidth = 1280.f);
     void hideAnimated(float screenWidth = 1280.f);
+    // Off draws only the name, with no glass bubble behind it.
+    void setBubbleVisible(bool visible) { m_bubbleVisible = visible; }
+    // Horizontal centre of the label. Negative = centre of the screen.
+    void setAnchorCenterX(float x);
 
 protected:
     void onRender(nxui::Renderer& ren) override;
@@ -32,4 +36,9 @@ private:
     nxui::AnimatedFloat m_textReveal{1.f};
     bool m_layoutInitialized = false;
     bool m_hideOnCollapse = false;
+    bool m_bubbleVisible = true;
+    float m_anchorCenterX = -1.f;
+    float centerFor(float screenWidth) const {
+        return m_anchorCenterX >= 0.f ? m_anchorCenterX : screenWidth * 0.5f;
+    }
 };

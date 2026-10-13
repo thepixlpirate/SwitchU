@@ -25,6 +25,7 @@ void IconGrid::setup(std::vector<std::shared_ptr<GlossyIcon>> icons,
                      float padX, float padY)
 {
     m_allIcons = std::move(icons);
+    syncIconStyles();
     reconfigureLayout(cols, rows, cellW, cellH, padX, padY);
 }
 
@@ -36,6 +37,7 @@ void IconGrid::setLayoutMode(AppLayoutMode mode) {
         ? m_page
         : (cur >= 0 ? cur / perPage : m_page);
     m_layoutMode = mode;
+    syncIconStyles();
     if (m_layoutMode == AppLayoutMode::DynamicLine) {
         m_lineScrollOffset.setImmediate(cur >= 0 ? static_cast<float>(cur) : 0.f);
         layoutLine();
@@ -52,6 +54,87 @@ void IconGrid::setLayoutMode(AppLayoutMode mode) {
     m_layoutMorph.setImmediate(toLine ? 0.f : 1.f);
     m_layoutMorph.set(toLine ? 1.f : 0.f, kLayoutMorphDuration,
                       nxui::Easing::inOutCubic);
+}
+
+void IconGrid::setLineStyle(int style) {
+    style = std::clamp(style, 0, 2);
+    if (m_lineStyle == style) return;
+    m_lineStyle = style;
+    m_lineLayoutCacheCount = -1;
+    syncIconStyles();
+    if (m_layoutMode == AppLayoutMode::DynamicLine) {
+        layoutLine();
+        for (int i = 0; i < (int)m_allIcons.size(); ++i)
+            if (m_allIcons[i]) m_allIcons[i]->setRect(dynamicIconRect(i));
+    }
+}
+
+void IconGrid::setCenteredLayout(int coversShown, bool barAtBottom) {
+    m_centerShown = coversShown >= 5 ? 5 : 3;
+    m_centerBarBottom = barAtBottom;
+    m_lineLayoutCacheCount = -1;
+    if (m_layoutMode == AppLayoutMode::DynamicLine && m_lineStyle == 2) {
+        for (int i = 0; i < (int)m_allIcons.size(); ++i)
+            if (m_allIcons[i]) m_allIcons[i]->setRect(dynamicIconRect(i));
+    }
+}
+
+IconGrid::CenteredMetrics IconGrid::centeredMetrics() const {
+    // Screen space (1280x720). With the bar at the bottom the covers use the
+    // top of the screen; with the bar on top they start below it.
+    CenteredMetrics m{};
+    if (m_centerBarBottom) {
+        m.cardH = 540.f;
+        m.centerY = 24.f + m.cardH * 0.5f;
+    } else {
+        m.cardH = 456.f;
+        m.centerY = 96.f + m.cardH * 0.5f;
+    }
+    m.cardW = m.cardH * 2.f / 3.f;
+    m.gap = m_centerShown >= 5 ? 24.f : 48.f;
+    // Inside a folder the panel starts lower; keep covers inside it.
+    if (m_rect.y > 120.f) {
+        m.cardH = std::min(m.cardH, m_rect.height - 60.f);
+        m.cardW = m.cardH * 2.f / 3.f;
+        m.centerY = m_rect.y + 10.f + m.cardH * 0.5f;
+    }
+    return m;
+}
+
+float IconGrid::centeredOffsetX(float d) const {
+    // Centre-to-centre distance: focused (full) to first neighbour (half),
+    // then half to half. Linear in between so the gap never closes while a
+    // cover grows and its neighbour shrinks.
+    const CenteredMetrics m = centeredMetrics();
+    const float first = m.cardW * 0.5f + m.gap + m.cardW * 0.25f;
+    const float step = m.cardW * 0.5f + m.gap;
+    const float a = std::abs(d);
+    const float x = a <= 1.f ? a * first : first + (a - 1.f) * step;
+    return d < 0.f ? -x : x;
+}
+
+void IconGrid::syncIconStyles() {
+    const bool portrait = isPortraitLine();
+    for (auto& icon : m_allIcons) {
+        if (!icon) continue;
+        icon->setPortraitStyle(portrait);
+        // Empty "add here" slots are invisible in the portrait row, so the
+        // cursor must not land on them either.
+        if (icon->entryKind() == GridEntryKind::Empty)
+            icon->setFocusable(!portrait);
+    }
+}
+
+nxui::Rect IconGrid::portraitFocusRestRect() const {
+    if (m_lineStyle == 2) {
+        const CenteredMetrics m = centeredMetrics();
+        const float cx = m_rect.x + m_rect.width * 0.5f;
+        return {cx - m.cardW * 0.5f, m.centerY - m.cardH * 0.5f, m.cardW, m.cardH};
+    }
+    constexpr float kCardW = 256.f * 1.09f;
+    constexpr float kCardH = 384.f * 1.09f;
+    const float bottomY = m_rect.y + m_rect.height * 0.856f;
+    return {m_rect.x + 96.f, bottomY - kCardH, kCardW, kCardH};
 }
 
 bool IconGrid::isDynamicLineScrolling() const {
@@ -272,7 +355,7 @@ void IconGrid::layoutLine() {
         icon->setCustomNavigation(nxui::FocusDirection::RIGHT,
                                   right >= 0 ? m_allIcons[(size_t)right].get() : nullptr);
         icon->setCustomNavigation(nxui::FocusDirection::UP, m_lineUpTarget);
-        icon->setCustomNavigation(nxui::FocusDirection::DOWN, nullptr);
+        icon->setCustomNavigation(nxui::FocusDirection::DOWN, m_lineDownTarget);
         addChild(icon);
         if (icon->isFocusable())
             fItems.push_back(icon.get());
@@ -345,6 +428,60 @@ int IconGrid::focusedGlobalIndex() const {
 nxui::Rect IconGrid::dynamicIconRect(int index, float* outScale,
                                      float* outOpacity,
                                      float* outDistance) const {
+    if (m_lineStyle == 2) {
+        // Focused cover in the middle at full size; the others at half size,
+        // two (or one) on each side. Further covers fade out at the edges.
+        const CenteredMetrics m = centeredMetrics();
+        auto smooth = [](float t) {
+            t = std::clamp(t, 0.f, 1.f);
+            return t * t * (3.f - 2.f * t);
+        };
+        const float d = static_cast<float>(index) - m_lineScrollOffset.value();
+        const float absD = std::abs(d);
+        const float s = 0.5f + 0.5f * (absD < 1.f ? smooth(1.f - absD) : 0.f);
+        const float side = m_centerShown >= 5 ? 2.f : 1.f;
+        const float a = absD <= side ? 1.f : std::max(0.f, 1.f - (absD - side) * 1.4f);
+        const float w = m.cardW * s;
+        const float h = m.cardH * s;
+        const float cx = m_rect.x + m_rect.width * 0.5f + centeredOffsetX(d);
+        if (outScale) *outScale = s;
+        if (outOpacity) *outOpacity = a;
+        if (outDistance) *outDistance = absD;
+        return {cx - w * 0.5f, m.centerY - h * 0.5f, w, h};
+    }
+
+    if (m_lineStyle == 1) {
+        // Switch-style shelf: 2:3 covers sitting on one baseline. The focused
+        // cover rests at the left anchor and grows a little; the rest follow
+        // at an even gap.
+        constexpr float kCardW = 256.f;
+        constexpr float kCardH = 384.f;
+        constexpr float kGap = 11.f;
+        constexpr float kGrow = 1.09f;
+        const float stride = kCardW + kGap;
+        const float anchorX = m_rect.x + 96.f;
+        const float bottomY = m_rect.y + m_rect.height * 0.856f;
+        auto smooth = [](float t) {
+            t = std::clamp(t, 0.f, 1.f);
+            return t * t * (3.f - 2.f * t);
+        };
+        const float d = static_cast<float>(index) - m_lineScrollOffset.value();
+        const float absD = std::abs(d);
+        const float g = absD < 1.f ? smooth(1.f - absD) : 0.f;
+        const float s = 1.f + (kGrow - 1.f) * g;
+        const float w = kCardW * s;
+        const float h = kCardH * s;
+        // Covers right of the focused one move over by however much it grew,
+        // so the gap stays the same while the row scrolls.
+        const float shift = d > 0.f ? kCardW * (kGrow - 1.f) * smooth(d) : 0.f;
+        const float x = anchorX + d * stride + shift;
+        const float y = bottomY - h;
+        if (outScale) *outScale = s;
+        if (outOpacity) *outOpacity = 1.f;
+        if (outDistance) *outDistance = absD;
+        return {x, y, w, h};
+    }
+
     const float centerX = m_rect.x + m_rect.width * 0.5f;
     // Leave a dedicated control strip below the profiles, then place the app
     // carousel in the lower half of the HOME scene.
@@ -767,7 +904,9 @@ void IconGrid::renderPageAt(nxui::Renderer& ren, int page, float dx) {
 }
 
 void IconGrid::renderDynamicLine(nxui::Renderer& ren) {
-    ren.pushClipRect(m_rect);
+    // The centred style uses the whole screen height for bigger covers.
+    ren.pushClipRect(m_lineStyle == 2 && m_rect.y < 120.f
+                         ? nxui::Rect{0.f, 0.f, 1280.f, 720.f} : m_rect);
 
     // The focused index is a linear scan over every icon. Reading it inside the
     // loop made the whole pass quadratic in the installed title count for a
@@ -783,7 +922,13 @@ void IconGrid::renderDynamicLine(nxui::Renderer& ren) {
         float a = 1.f;
         float absD = 0.f;
         const nxui::Rect r = dynamicIconRect(i, &s, &a, &absD);
-        if (absD > 4.5f && i != focusedIndex) continue;
+        if (m_lineStyle == 2) {
+            if (a <= 0.01f && i != focusedIndex) continue;
+        } else if (m_lineStyle == 1) {
+            if ((r.x + r.width < m_rect.x || r.x > m_rect.x + m_rect.width)
+                && i != focusedIndex)
+                continue;
+        } else if (absD > 4.5f && i != focusedIndex) continue;
         const float d = r.center().x - m_rect.center().x;
         candidates.push_back({i, absD, d, s, a, r});
     }

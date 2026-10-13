@@ -272,6 +272,35 @@ bool fetchImage(const nlohmann::json& images, bool portrait,
     return saveBytes(path, themeshop::http::getBytes(url, {}, onProgress, shouldAbort));
 }
 
+// Tall 2:3 cover ("grid" on SteamGridDB) for the portrait home row. Missing
+// covers are not an error: the row falls back to the square icon.
+bool fetchPortraitCover(long long gameId, std::uint64_t titleId,
+                        const std::list<std::string>& headers,
+                        const themeshop::http::AbortCheck& shouldAbort) {
+    if (gameId <= 0 || titleId == 0) return false;
+    try {
+        const std::string url = std::string(kApiBase) + "/grids/game/"
+                              + std::to_string(gameId)
+                              + "?dimensions=600x900,342x482,660x930"
+                              + "&nsfw=false&humor=false&types=static"
+                              + "&mimes=image/png,image/jpeg";
+        const auto images = apiData(url, headers, shouldAbort);
+        std::error_code ec;
+        std::filesystem::create_directories(titleDirectory(titleId), ec);
+        const bool saved = fetchImage(images, true,
+                                      SteamGridDbManager::portraitPath(titleId),
+                                      {}, shouldAbort);
+        DebugLog::log("[steamgriddb] portrait title=0x%016llX candidates=%d saved=%d",
+                      static_cast<unsigned long long>(titleId),
+                      images.is_array() ? static_cast<int>(images.size()) : 0,
+                      saved ? 1 : 0);
+        return saved;
+    } catch (const std::exception& ex) {
+        DebugLog::log("[steamgriddb] portrait failed: %s", ex.what());
+        return false;
+    }
+}
+
 bool prepareArtwork(SteamGridDbManager::ArtworkKind kind, const std::string& path) {
     if (kind == SteamGridDbManager::ArtworkKind::Hero)
         return steamgriddb::artwork::prepare(path, 1280, 720, true);
@@ -571,6 +600,10 @@ std::string SteamGridDbManager::iconPath(std::uint64_t titleId) {
     return titleDirectory(titleId) + "/icon.img";
 }
 
+std::string SteamGridDbManager::portraitPath(std::uint64_t titleId) {
+    return titleDirectory(titleId) + "/portrait.img";
+}
+
 bool SteamGridDbManager::hasArtwork(std::uint64_t titleId) {
     std::error_code ec;
     return cacheUsesCurrentMatcher(titleId)
@@ -609,6 +642,10 @@ bool SteamGridDbManager::clearArtwork(std::uint64_t titleId, ArtworkKind kind) {
     }
     if (clearIcon)
         removeFile(iconPath(titleId));
+    if (kind == ArtworkKind::None) {
+        removeFile(portraitPath(titleId));
+        removeFile(portraitPath(titleId) + ".300x450.rgba-cache");
+    }
 
     nlohmann::json metadata = readMetadata(titleId);
     if (clearHero) {
@@ -842,6 +879,21 @@ void SteamGridDbManager::scrape(std::string apiKey, std::vector<AppEntry> apps) 
         // trusted hero or logo, leave its manual/default choices untouched.
         // Per-title browsing is the explicit path for replacing artwork.
         if (hasArtwork(app.titleId)) {
+            // Already matched earlier: only add the portrait cover if this
+            // title does not have one yet.
+            if (!std::filesystem::exists(portraitPath(app.titleId), ec)) {
+                ec.clear();
+                const long long knownGameId =
+                    readMetadata(app.titleId).value("steamGridDbGameId", 0LL);
+                if (knownGameId > 0) {
+                    updateStatus([&](Status& s) {
+                        s.currentTitle = app.title;
+                        s.message = "Downloading cover for " + app.title;
+                    });
+                    fetchPortraitCover(knownGameId, app.titleId, headers, shouldAbort);
+                }
+            }
+            ec.clear();
             updateStatus([](Status& s) {
                 ++s.completed;
                 ++s.matched;
@@ -951,6 +1003,8 @@ void SteamGridDbManager::scrape(std::string apiKey, std::vector<AppEntry> apps) 
             const bool logoOk = fetchArtwork("/logos", "image/png", false,
                                              ArtworkKind::Logo, logoPath(app.titleId),
                                              0.55f, 0.35f);
+            if (m_cancelRequested.load()) break;
+            fetchPortraitCover(gameId, app.titleId, headers, shouldAbort);
             if (m_cancelRequested.load()) break;
             matched = heroOk || logoOk;
 

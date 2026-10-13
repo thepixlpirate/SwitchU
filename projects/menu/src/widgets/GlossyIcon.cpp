@@ -581,7 +581,84 @@ void GlossyIcon::onContentUpdate(float dt) {
         m_jigglePhase += dt;
 }
 
+void GlossyIcon::renderPortrait(nxui::Renderer& ren) {
+    const float appear = m_animScale.value();
+    const float a = m_appearOpacity.value() * m_opacity;
+    if (a < 0.01f) return;
+
+    nxui::Rect r = m_rect;
+    if (m_hasAppearOrigin) {
+        if (appear >= 0.999f && !m_disappearing)
+            m_hasAppearOrigin = false;
+        r = nxui::Rect::lerp(m_appearOrigin, m_rect, appear);
+    } else if (appear < 0.999f) {
+        if (appear < 0.01f) return;
+        const float w = r.width * appear;
+        const float h = r.height * appear;
+        r = {r.x + (r.width - w) * 0.5f, r.y + (r.height - h) * 0.5f, w, h};
+    }
+
+    const float jig = m_jiggleAmount.value();
+    if (jig > 0.001f) {
+        const float p = m_jigglePhase;
+        r.x += 2.2f * jig * std::sin(p * 9.0f + m_jiggleSeed);
+        r.y += 1.8f * jig * std::sin(p * 11.3f + m_jiggleSeed * 1.7f);
+    }
+
+    const float rad = std::min(18.f, r.width * 0.07f);
+    ren.drawRoundedRect({r.x + 1.f, r.y + 6.f, r.width, r.height},
+                        nxui::Color(0.f, 0.f, 0.f, 0.30f * a), rad + 1.f);
+
+    if (m_portraitTex && m_portraitTex->valid()) {
+        ren.drawTextureSubRounded(m_portraitTex, centeredCoverSource(*m_portraitTex, r), r,
+                                  rad, nxui::Color::white().withAlpha(a));
+    } else {
+        // No cover yet: the regular square icon on a dark card, so every
+        // title still lines up with the same tall shape.
+        ren.drawRoundedRect(r, nxui::Color(0.12f, 0.12f, 0.14f, a), rad);
+        if (m_tex && m_tex->valid()) {
+            const float side = r.width;
+            const nxui::Rect iconRect{r.x, r.y + (r.height - side) * 0.5f, side, side};
+            ren.drawTextureSubRounded(m_tex, centeredCoverSource(*m_tex, iconRect), iconRect,
+                                      0.f, nxui::Color::white().withAlpha(a));
+        } else {
+            ren.drawRoundedRect(r.shrunk(r.width * 0.2f),
+                                m_loadingColor.withAlpha(0.18f * a), rad);
+        }
+    }
+
+    if (m_notLaunchable)
+        ren.drawRoundedRect(r, nxui::Color(0.f, 0.f, 0.f, 0.55f * a), rad);
+
+    if (m_suspended) {
+        const float pulse = 0.5f + 0.5f * std::sin(m_suspendPulse);
+        const nxui::Color glow(0.20f, 0.92f, 0.50f, 1.f);
+        ren.drawRoundedRectOutline(r.expanded(2.f), glow.withAlpha((0.55f + 0.35f * pulse) * a),
+                                   rad + 2.f, 3.2f);
+    }
+}
+
 void GlossyIcon::onRender(nxui::Renderer& ren) {
+    // The portrait row only shows real items, never the empty "add here" slots.
+    if (m_portraitStyle && (m_entryKind == GridEntryKind::Empty ||
+                            m_entryKind == GridEntryKind::WidgetContinuation))
+        return;
+    if (m_portraitStyle && m_entryKind == GridEntryKind::Application) {
+        renderPortrait(ren);
+        return;
+    }
+    if (m_portraitStyle && m_rect.height > m_rect.width * 1.05f) {
+        // Folders and widgets keep their square art, centred on the tall slot.
+        const nxui::Rect saved = m_rect;
+        const float side = m_rect.width;
+        m_rect = {saved.x, saved.y + (saved.height - side) * 0.5f, side, side};
+        const bool savedPortrait = m_portraitStyle;
+        m_portraitStyle = false;
+        onRender(ren);
+        m_portraitStyle = savedPortrait;
+        m_rect = saved;
+        return;
+    }
     float externalScale = scale();
     float focusS = m_focusScale.value();
     float appear = m_animScale.value();

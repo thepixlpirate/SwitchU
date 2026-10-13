@@ -105,6 +105,41 @@ bool AppConfig::load() {
                 lastOpened.emplace_back(titleId, value.get<std::uint64_t>());
         }
     }
+    readJsonOpt(j, "homeShowProfileButton", homeShowProfileButton);
+    readJsonOpt(j, "homeShowHudBubbles", homeShowHudBubbles);
+    readJsonOpt(j, "homeShowMiiButton", homeShowMiiButton);
+    readJsonOpt(j, "homeShowControllersButton", homeShowControllersButton);
+    readJsonOpt(j, "homeShowHomebrewButton", homeShowHomebrewButton);
+    readJsonOpt(j, "homeShowSleepButton", homeShowSleepButton);
+    readJsonOpt(j, "homeShowThemesButton", homeShowThemesButton);
+    readJsonOpt(j, "homeShowButtonHints", homeShowButtonHints);
+    readJsonOpt(j, "homeShowDate", homeShowDate);
+    readJsonOpt(j, "homeClockPosition", homeClockPosition);
+    readJsonOpt(j, "homeShowClock", homeShowClock);
+    readJsonOpt(j, "homeShowBattery", homeShowBattery);
+    readJsonOpt(j, "homeCoversShown", homeCoversShown);
+    readJsonOpt(j, "homePlusAction", homePlusAction);
+    readJsonOpt(j, "homeMinusAction", homeMinusAction);
+    readJsonOpt(j, "homeLineStyle", homeLineStyle);
+    // A settings file written by an older build has no such key.
+    homeDefaultsVersion = 0;
+    readJsonOpt(j, "homeDefaultsVersion", homeDefaultsVersion);
+    hiddenTitles.clear();
+    if (auto it = j.find("hiddenTitles"); it != j.end() && it->is_array()) {
+        for (const auto& item : *it) {
+            if (!item.is_string()) continue;
+            const auto titleId = std::strtoull(item.get<std::string>().c_str(), nullptr, 16);
+            if (titleId != 0 && !isTitleHidden(titleId)) hiddenTitles.push_back(titleId);
+        }
+    }
+    coverChoices.clear();
+    if (auto it = j.find("coverChoices"); it != j.end() && it->is_object()) {
+        for (auto& [key, value] : it->items()) {
+            if (!value.is_string()) continue;
+            const auto titleId = std::strtoull(key.c_str(), nullptr, 16);
+            if (titleId != 0) coverChoices.emplace_back(titleId, value.get<std::string>());
+        }
+    }
     readJsonOpt(j, "themePreset", themePreset);
     readJsonOpt(j, "autoThemeMode", autoThemeMode);
     readJsonOpt(j, "autoThemeDayPreset", autoThemeDayPreset);
@@ -134,6 +169,23 @@ bool AppConfig::load() {
     if (!defaultProfileEnabled) defaultProfileUid.clear();
     accessibilitySpeechRate = std::clamp(accessibilitySpeechRate, 120, 320);
     sortMode = std::clamp(sortMode, 0, 2);
+    homeLineStyle = std::clamp(homeLineStyle, 0, 2);
+    homeClockPosition = std::clamp(homeClockPosition, 0, 2);
+    homeCoversShown = homeCoversShown >= 5 ? 5 : 3;
+    homePlusAction = std::clamp(homePlusAction, 0, 1);
+    homeMinusAction = std::clamp(homeMinusAction, 0, 1);
+    if (homeDefaultsVersion < kHomeDefaultsVersion) {
+        // First start of this build on an existing install: switch to the
+        // minimal single-row look once (centred portrait covers, 12-hour
+        // clock). Everything stays editable in Settings and is never forced
+        // again.
+        appLayoutMode = AppLayoutMode::DynamicLine;
+        homeLineStyle = 2;
+        clockUse12Hour = true;
+        homeClockPosition = 2;
+        homeCoversShown = 5;
+        homeDefaultsVersion = kHomeDefaultsVersion;
+    }
     if (themePreset.empty()) themePreset = "Default Light";
     if (!hasShowCoverKey) {
         // Local 9-style table used while vetting Cover/Plate as separate styles.
@@ -225,6 +277,38 @@ bool AppConfig::save() const {
             opened[key] = entry.second;
         }
         j["lastOpened"] = std::move(opened);
+    }
+    j["homeShowProfileButton"] = homeShowProfileButton;
+    j["homeShowHudBubbles"] = homeShowHudBubbles;
+    j["homeShowMiiButton"] = homeShowMiiButton;
+    j["homeShowControllersButton"] = homeShowControllersButton;
+    j["homeShowHomebrewButton"] = homeShowHomebrewButton;
+    j["homeShowSleepButton"] = homeShowSleepButton;
+    j["homeShowThemesButton"] = homeShowThemesButton;
+    j["homeShowButtonHints"] = homeShowButtonHints;
+    j["homeShowDate"] = homeShowDate;
+    j["homeClockPosition"] = std::clamp(homeClockPosition, 0, 2);
+    j["homeShowClock"] = homeShowClock;
+    j["homeShowBattery"] = homeShowBattery;
+    j["homeCoversShown"] = homeCoversShown >= 5 ? 5 : 3;
+    j["homePlusAction"] = std::clamp(homePlusAction, 0, 1);
+    j["homeMinusAction"] = std::clamp(homeMinusAction, 0, 1);
+    j["homeLineStyle"] = std::clamp(homeLineStyle, 0, 2);
+    j["homeDefaultsVersion"] = homeDefaultsVersion;
+    {
+        nlohmann::json hidden = nlohmann::json::array();
+        char key[17];
+        for (const auto titleId : hiddenTitles) {
+            std::snprintf(key, sizeof(key), "%016llX", static_cast<unsigned long long>(titleId));
+            hidden.push_back(key);
+        }
+        j["hiddenTitles"] = std::move(hidden);
+        nlohmann::json covers = nlohmann::json::object();
+        for (const auto& entry : coverChoices) {
+            std::snprintf(key, sizeof(key), "%016llX", static_cast<unsigned long long>(entry.first));
+            covers[key] = entry.second;
+        }
+        j["coverChoices"] = std::move(covers);
     }
     j["themePreset"] = themePreset;
     j["autoThemeMode"] = (autoThemeMode == "manual" || autoThemeMode == "geo") ? autoThemeMode : "off";

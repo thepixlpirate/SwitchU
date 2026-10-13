@@ -106,6 +106,14 @@ public:
     int gridSpanColumns() const { return m_widgetColumns; }
     int gridSpanRows() const { return m_widgetRows; }
 
+    // Switch-style portrait card (2:3). The grid sets the tall rect; the icon
+    // draws the cover art edge to edge, or the square icon on a dark card when
+    // no cover is available yet.
+    void setPortraitStyle(bool on) { m_portraitStyle = on; }
+    bool portraitStyle() const { return m_portraitStyle; }
+    void setPortraitTexture(nxui::Texture* tex) { m_portraitTex = tex; }
+    nxui::Texture* portraitTexture() const { return m_portraitTex; }
+
     void startAppear(float delay);
     // Reverse of a tile appear: fly back into `target` while shrinking out.
     void startDisappear(const nxui::Rect& target, float delay, float dur);
@@ -138,6 +146,9 @@ private:
     nxui::Texture*    m_gameCardTex = nullptr;
     nxui::Texture*    m_wideGameHero = nullptr;
     nxui::Texture*    m_wideGameLogo = nullptr;
+    nxui::Texture*    m_portraitTex = nullptr;
+    bool              m_portraitStyle = false;
+    void renderPortrait(nxui::Renderer& ren);
     uint64_t    m_titleId = 0;
     bool        m_focused = false;
     bool        m_focusable = true;

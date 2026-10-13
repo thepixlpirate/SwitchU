@@ -45,8 +45,18 @@ SourceStamp sourceStamp(const std::string& path) {
 }
 
 std::string cachePathFor(const std::string& source, int width, int height) {
-    return source + "." + std::to_string(width) + "x" + std::to_string(height)
+    const std::string suffix = "." + std::to_string(width) + "x" + std::to_string(height)
         + ".rgba-cache";
+    // Images that belong to the player (e.g. the /iconswap folder) are never
+    // written next to; their decoded copies live in SwitchU's own cache.
+    static constexpr const char* kOwnRoot = "sdmc:/config/SwitchU/";
+    if (source.rfind(kOwnRoot, 0) == 0)
+        return source + suffix;
+    std::string flat;
+    flat.reserve(source.size());
+    for (char c : source)
+        flat.push_back((c == '/' || c == ':' || c == '\\') ? '_' : c);
+    return std::string("sdmc:/config/SwitchU/cache/covers/") + flat + suffix;
 }
 
 bool load(const std::string& source, int width, int height,
@@ -100,6 +110,11 @@ void save(const std::string& source, int width, int height,
     header.payloadSize = expected;
 
     const std::string cachePath = cachePathFor(source, width, height);
+    {
+        std::error_code dirEc;
+        std::filesystem::create_directories(
+            std::filesystem::path(cachePath).parent_path(), dirEc);
+    }
     const std::string temporaryPath = cachePath + ".tmp";
     const auto started = std::chrono::steady_clock::now();
     std::ofstream output(temporaryPath, std::ios::binary | std::ios::trunc);

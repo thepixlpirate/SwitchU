@@ -156,6 +156,11 @@ void SelectionCursor::onRender(nxui::Renderer& ren) {
     nxui::Rect r = nxui::Rect{x, y, w, h}.expanded(4.f * arrival);
     float cr = m_cornerRadius.value() + 4.f * arrival;
 
+    if (m_plainStyle) {
+        ren.drawRoundedRectOutline(r, m_color.withAlpha(m_opacity), cr, m_borderWidth);
+        return;
+    }
+
     float wave = std::sin(m_time * m_waveSpeed) * 0.5f + 0.5f;
 
     constexpr int BLOOM_LAYERS = 5;

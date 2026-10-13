@@ -3,6 +3,8 @@
 #include "TabbedOverlayScreen.hpp"
 #include <nxui/core/Texture.hpp>
 #include <cstdint>
+#include <string>
+#include <vector>
 
 class GameOptionsScreen final : public TabbedOverlayScreen {
 public:
@@ -21,6 +23,10 @@ public:
         bool hasHeroArt = false;
         bool hasLogoArt = false;
         bool hasIconArt = false;
+        // Home-screen extras.
+        bool canHide = true;
+        std::vector<std::string> coverLabels;   // empty = no cover row
+        int coverIndex = 0;
     };
 
     GameOptionsScreen();
@@ -33,6 +39,8 @@ public:
     void onResize(IntCb cb) { m_resizeCb = std::move(cb); }
     void onCloseSoftware(VoidCb cb) { m_closeSoftwareCb = std::move(cb); }
     void onDeleteSoftware(VoidCb cb) { m_deleteSoftwareCb = std::move(cb); }
+    void onHide(VoidCb cb) { m_hideCb = std::move(cb); }
+    void onCoverSelect(IntCb cb) { m_coverSelectCb = std::move(cb); }
     void onSelectArtwork(std::function<void(ArtworkKind)> cb) {
         m_selectArtworkCb = std::move(cb);
     }
@@ -52,6 +60,8 @@ private:
     IntCb m_resizeCb;
     VoidCb m_closeSoftwareCb;
     VoidCb m_deleteSoftwareCb;
+    VoidCb m_hideCb;
+    IntCb m_coverSelectCb;
     std::function<void(ArtworkKind)> m_selectArtworkCb;
     std::function<void(ArtworkKind)> m_clearArtworkCb;
 };

@@ -357,6 +357,37 @@ private:
     std::string accessibilityContextFor(nxui::Widget* w) const;
     std::string accessibilityActionsFor(nxui::Widget* w) const;
 
+    // Settings > Home Screen: show/hide the optional home chrome and apply the
+    // single-row style. Safe to call any time after the HOME widgets exist.
+    void applyHomeChromeOptions();
+    void applyHomeOption(const std::string& key, int value);
+    void syncPortraitTitlePlacement();
+    // Portrait (2:3) covers for the Switch-style row, decoded off-thread and
+    // kept only for the covers near the focused game.
+    // Every cover image found for a game, best first: /iconswap (by title ID
+    // or name), /config/SwitchU/portraits, then the SteamGridDB download.
+    std::vector<std::string> coverCandidates(std::uint64_t titleId, const std::string& title);
+    std::string portraitSourcePath(std::uint64_t titleId, const std::string& title);
+    void rebuildIconSwapIndex();
+    void reloadCover(std::uint64_t titleId);
+    void hideTitle(std::uint64_t titleId);
+    void unhideTitle(std::uint64_t titleId);
+    void dropHiddenTitles(GridModel& model) const;
+    std::vector<std::pair<std::uint64_t, std::string>> hiddenGamesForSettings() const;
+    void pushHomeOptionsToSettings();
+    void layoutTopHud();
+    void applyBottomBarNavigation();
+    void openThemeShopScreen();
+    // Small pop-ups: + on a game, - on HOME, and a file browser for covers.
+    void showQuickGameMenu(GlossyIcon* icon);
+    void showCoverBrowser(std::uint64_t titleId, const std::string& title,
+                          const std::string& directory);
+    void showPowerMenu();
+    void confirmDeleteSoftware(std::uint64_t titleId, const std::string& title);
+    void syncPortraitCovers();
+    void pollPortraitCovers();
+    void releasePortraitCovers(bool all);
+
     void toggleAppLayoutMode();
     void setAppLayoutMode(AppLayoutMode mode);
     void configureDynamicLineNavigation();
@@ -556,6 +587,25 @@ private:
         std::atomic<bool> cancelled{false};
         std::int64_t elapsedMs = 0;
     };
+    struct PortraitDecodeState {
+        std::uint64_t titleId = 0;
+        steamgriddb::artwork::DecodedImage image;
+        std::atomic<bool> cancelled{false};
+    };
+    std::unordered_map<std::uint64_t, std::unique_ptr<nxui::Texture>> m_portraitCovers;
+    // /iconswap contents keyed by normalised name or title ID.
+    std::unordered_map<std::string, std::vector<std::string>> m_iconSwapIndex;
+    bool m_iconSwapIndexed = false;
+    bool m_homeRebuildPending = false;   // e.g. a game was unhidden in Settings
+    std::vector<std::string> m_gameOptionsCoverPaths;   // matches the Cover selector
+    std::function<void()> m_openThemeShopAction;
+    std::function<void()> m_openSettingsAction;
+    // Titles already looked up with no cover file, so they are not retried
+    // every frame. Cleared when the covers are reloaded.
+    std::unordered_map<std::uint64_t, bool> m_portraitMissing;
+    std::shared_ptr<PortraitDecodeState> m_portraitDecode;
+    std::future<void> m_portraitFuture;
+    float m_portraitRescanTimer = 0.f;
     std::vector<std::uint64_t> m_gameArtworkDecodeQueue;
     std::shared_ptr<GameArtworkDecodeState> m_gameArtworkDecode;
     std::shared_ptr<GameArtworkDecodeState> m_gameArtworkReady;

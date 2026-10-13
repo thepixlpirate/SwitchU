@@ -1,7 +1,10 @@
 #pragma once
 
 #include "TabbedOverlayScreen.hpp"
+#include <cstdint>
 #include <future>
+#include <utility>
+#include <vector>
 
 namespace settings::tabs {
 class SystemTab;
@@ -15,6 +18,7 @@ class BluetoothTab;
 class SleepTab;
 class StorageTab;
 class AboutTab;
+class HomeScreenTab;
 }
 
 class SettingsScreen : public TabbedOverlayScreen {
@@ -44,6 +48,32 @@ public:
     void onControllerTest(VoidCb cb) { m_controllerTestCb = std::move(cb); }
     using SoftwareDeleteCb = std::function<void(uint64_t, const std::string&)>;
     void onSoftwareDelete(SoftwareDeleteCb cb) { m_softwareDeleteCb = std::move(cb); }
+    // Home screen look. `key` names the option (see HomeScreenTab.cpp).
+    using HomeOptionCb = std::function<void(const std::string& key, int value)>;
+    void onHomeOptionChange(HomeOptionCb cb) { m_homeOptionCb = std::move(cb); }
+    struct HomeOptionsState {
+        bool singleRow = true;
+        int  lineStyle = 2;          // 0 = Wii U carousel, 1 = shelf, 2 = centred
+        int  clockPosition = 2;      // 0 = top middle, 1 = beside the battery, 2 = bottom bar
+        bool showClock = true;
+        bool showBattery = true;
+        int  coversShownIndex = 1;   // 0 = 3 covers, 1 = 5 covers
+        bool showDate = false;
+        int  plusAction = 0;         // 0 = quick popup, 1 = full options
+        int  minusAction = 0;        // 0 = power popup, 1 = switch view
+        bool showProfileButton = false;
+        bool showHudBubbles = false;
+        bool showHomebrewButton = false;
+        bool showMiiButton = false;
+        bool showControllersButton = false;
+        bool showSleepButton = false;
+        bool showThemesButton = false;
+        bool showButtonHints = false;
+        // Hidden games: title ID and name, for the unhide list.
+        std::vector<std::pair<std::uint64_t, std::string>> hiddenGames;
+    };
+    void setHomeOptionsState(const HomeOptionsState& state) { m_homeOptions = state; }
+    const HomeOptionsState& homeOptionsState() const { return m_homeOptions; }
     void onSleepRequest(VoidCb cb)      { m_sleepCb = std::move(cb); }
     void onShutdownRequest(VoidCb cb)   { m_shutdownCb = std::move(cb); }
     void onRebootRequest(VoidCb cb)     { m_rebootCb = std::move(cb); }
@@ -111,6 +141,7 @@ private:
     friend class settings::tabs::SleepTab;
     friend class settings::tabs::StorageTab;
     friend class settings::tabs::AboutTab;
+    friend class settings::tabs::HomeScreenTab;
 
     BoolCb m_wireframeCb;
     IntCb m_gridColumnsCb;
@@ -134,6 +165,8 @@ private:
     VoidCb m_sleepCb;
     VoidCb m_shutdownCb;
     VoidCb m_rebootCb;
+    HomeOptionCb m_homeOptionCb;
+    HomeOptionsState m_homeOptions;
 
     bool m_wireframeEnabled = false;
     int m_gridColumns = 5;
