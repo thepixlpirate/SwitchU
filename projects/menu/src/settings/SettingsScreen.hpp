@@ -59,6 +59,7 @@ public:
         bool showBattery = true;
         int  coversShownIndex = 1;   // 0 = 3 covers, 1 = 5 covers
         bool showDate = false;
+        int  dateFormat = 0;         // 0 = month/day/year, 1 = day/month/year
         int  plusAction = 0;         // 0 = quick popup, 1 = full options
         int  minusAction = 0;        // 0 = power popup, 1 = switch view
         bool showProfileButton = false;
@@ -68,6 +69,7 @@ public:
         bool showControllersButton = false;
         bool showSleepButton = false;
         bool showThemesButton = false;
+        bool showSettingsButton = true;
         bool showButtonHints = false;
         // Hidden games: title ID and name, for the unhide list.
         std::vector<std::pair<std::uint64_t, std::string>> hiddenGames;

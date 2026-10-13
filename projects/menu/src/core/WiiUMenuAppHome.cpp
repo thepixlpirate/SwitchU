@@ -94,7 +94,12 @@ void WiiUMenuApp::layoutTopHud() {
     m_topHud->layout();
     if (!m_clock || !m_battery)
         return;
-    if (m_config.homeClockPosition == 1) {
+    if (m_config.homeClockPosition == 0) {
+        // Top bar: clock on the left (after the profile button when shown).
+        nxui::Rect clock = m_clock->rect();
+        clock.x = m_config.homeShowProfileButton ? 24.f + 62.f + 16.f : 24.f;
+        m_clock->setRect(clock);
+    } else if (m_config.homeClockPosition == 1) {
         // Clock just left of the battery, like the Switch's top-right corner.
         nxui::Rect clock = m_clock->rect();
         const nxui::Rect battery = m_battery->rect();
@@ -147,6 +152,7 @@ void WiiUMenuApp::applyHomeChromeOptions() {
     if (m_clock) {
         m_clock->setBubbleVisible(bubbles);
         m_clock->setShowDate(m_config.homeShowDate);
+        m_clock->setMonthFirst(m_config.homeDateFormat == 0);
         m_clock->setUse12HourClock(m_config.clockUse12Hour);
     }
     if (m_battery) m_battery->setBubbleVisible(bubbles);
@@ -172,12 +178,15 @@ void WiiUMenuApp::applyHomeChromeOptions() {
     SidebarManager::Visibility visibility;
     visibility.homebrew = m_config.homeShowHomebrewButton;
     visibility.miiEditor = m_config.homeShowMiiButton;
-    visibility.settings = true;   // always reachable
+    // Settings may only disappear while - opens the power menu with Settings.
+    visibility.settings = m_config.homeShowSettingsButton || m_config.homeMinusAction != 0;
     visibility.controllers = m_config.homeShowControllersButton;
     visibility.sleep = m_config.homeShowSleepButton;
     visibility.themes = m_config.homeShowThemesButton;
     // With the clock in the top middle, the shortcuts move left of it.
-    m_sidebar.setCompactStripCenterX(m_config.homeClockPosition == 0 ? 330.f : 640.f);
+    // Only the original layout keeps the clock in the middle; the shortcuts
+    // then sit left of it. Everywhere else Settings is in the middle.
+    m_sidebar.setCompactStripCenterX(m_config.homeClockPosition == 3 ? 330.f : 640.f);
     // Bottom bar: Settings in the bottom middle, level with clock and battery.
     m_sidebar.setCompactStripY(m_config.homeClockPosition == 2 ? 656.f : 18.f);
     m_sidebar.setButtonVisibility(visibility);
@@ -208,6 +217,7 @@ void WiiUMenuApp::pushHomeOptionsToSettings() {
     home.showBattery = m_config.homeShowBattery;
     home.coversShownIndex = m_config.homeCoversShown >= 5 ? 1 : 0;
     home.showDate = m_config.homeShowDate;
+    home.dateFormat = m_config.homeDateFormat;
     home.plusAction = m_config.homePlusAction;
     home.minusAction = m_config.homeMinusAction;
     home.showProfileButton = m_config.homeShowProfileButton;
@@ -217,6 +227,7 @@ void WiiUMenuApp::pushHomeOptionsToSettings() {
     home.showControllersButton = m_config.homeShowControllersButton;
     home.showSleepButton = m_config.homeShowSleepButton;
     home.showThemesButton = m_config.homeShowThemesButton;
+    home.showSettingsButton = m_config.homeShowSettingsButton;
     home.showButtonHints = m_config.homeShowButtonHints;
     home.hiddenGames = hiddenGamesForSettings();
     m_settings->setHomeOptionsState(home);
@@ -246,11 +257,12 @@ void WiiUMenuApp::applyHomeOption(const std::string& key, int value) {
         return;
     }
     if (key == "lineStyle")                  m_config.homeLineStyle = std::clamp(value, 0, 2);
-    else if (key == "clockPosition")         m_config.homeClockPosition = std::clamp(value, 0, 2);
+    else if (key == "clockPosition")         m_config.homeClockPosition = std::clamp(value, 0, 3);
     else if (key == "showClock")             m_config.homeShowClock = on;
     else if (key == "showBattery")           m_config.homeShowBattery = on;
     else if (key == "coversShown")           m_config.homeCoversShown = value >= 1 ? 5 : 3;
     else if (key == "showDate")              m_config.homeShowDate = on;
+    else if (key == "dateFormat")            m_config.homeDateFormat = std::clamp(value, 0, 1);
     else if (key == "plusAction")            m_config.homePlusAction = std::clamp(value, 0, 1);
     else if (key == "minusAction")           m_config.homeMinusAction = std::clamp(value, 0, 1);
     else if (key == "showProfileButton")     m_config.homeShowProfileButton = on;
@@ -260,6 +272,7 @@ void WiiUMenuApp::applyHomeOption(const std::string& key, int value) {
     else if (key == "showControllersButton") m_config.homeShowControllersButton = on;
     else if (key == "showSleepButton")       m_config.homeShowSleepButton = on;
     else if (key == "showThemesButton")      m_config.homeShowThemesButton = on;
+    else if (key == "showSettingsButton")    m_config.homeShowSettingsButton = on;
     else if (key == "showButtonHints")       m_config.homeShowButtonHints = on;
     else return;
 
@@ -639,11 +652,6 @@ nxui::Rect centredMenuAnchor() {
     return {640.f - 156.f - 16.f - 1.f, 340.f, 1.f, 40.f};
 }
 
-std::string lowerCopy(std::string text) {
-    std::transform(text.begin(), text.end(), text.begin(),
-                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-    return text;
-}
 
 } // namespace
 
@@ -722,84 +730,22 @@ void WiiUMenuApp::showQuickGameMenu(GlossyIcon* icon) {
 
 void WiiUMenuApp::showCoverBrowser(std::uint64_t titleId, const std::string& title,
                                    const std::string& directory) {
-    if (!m_contextMenu) return;
-    auto& i18n = nxui::I18n::instance();
-    if (!m_contextMenu->isActive())
-        m_contextMenuReturnFocus = focusManager().current();
-
-    namespace fs = std::filesystem;
-    std::string dir = directory;
-    if (dir.empty()) dir = "sdmc:/";
-    // "sdmc:/" is the top; anything else has a parent folder.
-    const bool atRoot = dir == "sdmc:/" || dir == "sdmc:";
-    std::string parent = "sdmc:/";
-    if (!atRoot) {
-        const auto slash = dir.find_last_of('/');
-        parent = (slash == std::string::npos || slash <= 5) ? "sdmc:/" : dir.substr(0, slash);
+    if (!m_coverBrowser || titleId == 0) return;
+    if (m_contextMenu && m_contextMenu->isActive())
+        m_contextMenu->hide(false);
+    m_contextMenuReturnFocus = nullptr;
+    m_coverBrowserTitleId = titleId;
+    // Open in the folder of the current cover when it is a file, else `directory`.
+    std::string start = directory;
+    const std::string choice = m_config.coverChoiceFor(titleId);
+    if (!choice.empty() && choice != "icon" && fileExists(choice)) {
+        const auto slash = choice.find_last_of('/');
+        if (slash != std::string::npos && slash > 5) start = choice.substr(0, slash);
     }
-
-    std::vector<std::pair<std::string, std::string>> folders;   // label, path
-    std::vector<std::pair<std::string, std::string>> images;
-    std::error_code ec;
-    fs::directory_iterator it(dir, ec), end;
-    for (; !ec && it != end; it.increment(ec)) {
-        std::error_code typeEc;
-        const std::string name = it->path().filename().string();
-        if (name.empty() || name[0] == '.') continue;
-        std::string path = dir;
-        if (path.back() != '/') path += '/';
-        path += name;
-        if (it->is_directory(typeEc))
-            folders.emplace_back(name, path);
-        else if (it->is_regular_file(typeEc) && isImageFile(it->path()))
-            images.emplace_back(name, path);
-    }
-    auto byName = [](const auto& a, const auto& b) { return lowerCopy(a.first) < lowerCopy(b.first); };
-    std::sort(folders.begin(), folders.end(), byName);
-    std::sort(images.begin(), images.end(), byName);
-
-    auto choose = [this, titleId](const std::string& choice) {
-        m_contextMenu->hide();
-        m_config.setCoverChoice(titleId, choice);
-        if (m_configSaveFuture.valid())
-            m_configSaveFuture.wait();
-        m_configSaveFuture = m_threadPool.submit([config = m_config]() { config.save(); });
-        reloadCover(titleId);
-        m_audio.playSfx(Sfx::ConfirmPositive);
-    };
-
-    std::vector<ContextMenu::Item> items;
-    if (!atRoot)
-        items.push_back({i18n.tr("browser.up", ".. (Back a folder)"),
-                         [this, titleId, title, parent]() { showCoverBrowser(titleId, title, parent); }});
-    for (const auto& folder : folders) {
-        const std::string path = folder.second;
-        items.push_back({"[" + folder.first + "]",
-                         [this, titleId, title, path]() { showCoverBrowser(titleId, title, path); }});
-    }
-    for (const auto& image : images) {
-        const std::string path = image.second;
-        items.push_back({image.first, [choose, path]() { choose(path); }});
-    }
-    items.push_back({i18n.tr("game.cover_auto", "Automatic Cover"),
-                     [choose]() { choose(std::string()); }});
-    items.push_back({i18n.tr("game.cover_icon", "Original Icon"),
-                     [choose]() { choose("icon"); }});
-
-    // Title: the folder being browsed, without the "sdmc:" prefix.
-    std::string shown = dir.rfind("sdmc:", 0) == 0 ? dir.substr(5) : dir;
-    if (shown.empty()) shown = "/";
-
-    // B goes back a folder; at the top it closes the browser.
-    ContextMenu::VoidCallback onBack;
-    if (!atRoot)
-        onBack = [this, titleId, title, parent]() { showCoverBrowser(titleId, title, parent); };
-
-    nxui::Rect anchor = centredMenuAnchor();
-    if (m_grid && m_grid->isPortraitLine())
-        anchor = m_grid->portraitFocusRestRect();
-    m_contextMenu->show(anchor, shown, std::move(items), 0, std::move(onBack));
-    focusManager().setFocus(m_contextMenu.get());
+    m_navigator.navigate(switchu::navigation::Route::GameOptions);
+    m_coverBrowser->open(title, start, choice);
+    m_audio.playSfx(Sfx::ModalShow);
+    focusManager().setFocus(m_coverBrowser.get());
 }
 
 void WiiUMenuApp::showPowerMenu() {

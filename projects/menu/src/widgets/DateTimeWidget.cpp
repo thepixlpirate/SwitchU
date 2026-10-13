@@ -37,9 +37,9 @@ void DateTimeWidget::onContentUpdate(float dt) {
                       static_cast<unsigned>(calendar.minute));
     }
     m_timeStr = buf;
-    std::snprintf(buf, sizeof(buf), "%02u/%02u/%04u",
-                  static_cast<unsigned>(calendar.day),
-                  static_cast<unsigned>(calendar.month),
+    const unsigned first = m_monthFirst ? calendar.month : calendar.day;
+    const unsigned second = m_monthFirst ? calendar.day : calendar.month;
+    std::snprintf(buf, sizeof(buf), "%02u/%02u/%04u", first, second,
                   static_cast<unsigned>(calendar.year));
     m_dateStr = buf;
 }

@@ -165,10 +165,12 @@ SettingsScreen::Tab settings::tabs::HomeScreenTab::build(SettingsScreen& screen)
     }
     addSelector(i18n.tr("settings.home.clock_position", "Clock and Battery Position"),
                 i18n.tr("settings.home.clock_position_desc",
-                        "Bottom Bar: clock bottom-left, Settings bottom-middle, battery bottom-right."),
-                {i18n.tr("settings.home.clock_middle", "Top (Original)"),
+                        "Top/Bottom Bar: clock on the left, Settings in the middle, battery on the right. "
+                        "Original: clock in the top middle."),
+                {i18n.tr("settings.home.clock_top_bar", "Top Bar"),
                  i18n.tr("settings.home.clock_right", "Top Right Together"),
-                 i18n.tr("settings.home.clock_bottom", "Bottom Bar")},
+                 i18n.tr("settings.home.clock_bottom", "Bottom Bar"),
+                 i18n.tr("settings.home.clock_original", "Original")},
                 "clockPosition", &S::clockPosition);
     addToggle(i18n.tr("settings.home.show_clock", "Show Clock"),
               i18n.tr("settings.home.show_clock_desc", "The time on the Home screen."),
@@ -179,6 +181,11 @@ SettingsScreen::Tab settings::tabs::HomeScreenTab::build(SettingsScreen& screen)
     addToggle(i18n.tr("settings.home.show_date", "Show Date"),
               i18n.tr("settings.home.show_date_desc", "A small date line under the time."),
               "showDate", &S::showDate);
+    addSelector(i18n.tr("settings.home.date_format", "Date Format"),
+                i18n.tr("settings.home.date_format_desc", "How the date under the clock is written."),
+                {i18n.tr("settings.home.date_mdy", "Month/Day/Year"),
+                 i18n.tr("settings.home.date_dmy", "Day/Month/Year")},
+                "dateFormat", &S::dateFormat);
 
     // --- What is on the HOME screen ---------------------------------------
     addSection(i18n.tr("settings.home.section_show", "Show on Home Screen"));
@@ -190,6 +197,11 @@ SettingsScreen::Tab settings::tabs::HomeScreenTab::build(SettingsScreen& screen)
               i18n.tr("settings.home.hud_bubbles_desc",
                       "See-through bubbles behind the clock, battery and game name."),
               "showHudBubbles", &S::showHudBubbles);
+    addToggle(i18n.tr("settings.home.settings_button", "Settings Button"),
+              i18n.tr("settings.home.settings_button_desc",
+                      "The Settings icon on the Home screen. When hidden, open Settings with the - button "
+                      "(only while - is set to Power Menu)."),
+              "showSettingsButton", &S::showSettingsButton);
     addToggle(i18n.tr("settings.home.homebrew_button", "Homebrew Button"),
               i18n.tr("settings.home.homebrew_button_desc", "Shortcut to the Album / homebrew menu."),
               "showHomebrewButton", &S::showHomebrewButton);

@@ -18,6 +18,7 @@
 #include "widgets/OverlayDialog.hpp"
 #include "widgets/QuickSettingsOverlay.hpp"
 #include "widgets/ContextMenu.hpp"
+#include "widgets/CoverBrowser.hpp"
 #include "widgets/ProgressDialog.hpp"
 #include "widgets/AppletButton.hpp"
 #include "widgets/PageIndicator.hpp"
@@ -441,6 +442,8 @@ private:
     std::shared_ptr<OverlayDialog>     m_dialog;
     std::shared_ptr<QuickSettingsOverlay> m_quickSettings;
     std::shared_ptr<ContextMenu>       m_contextMenu;
+    std::shared_ptr<CoverBrowser>      m_coverBrowser;
+    std::uint64_t                      m_coverBrowserTitleId = 0;
     std::shared_ptr<ProgressDialog>    m_progressDialog;
     std::shared_ptr<SettingsScreen>    m_settings;
     std::shared_ptr<ThemeShopScreen>   m_themeShop;

@@ -539,6 +539,11 @@ void WiiUMenuApp::createSettings() {
         if (isCurrentFocusableWidget(m_sidebar.settingsButton())) {
             m_suppressNextNavigateSfx = true;
             focusManager().setFocus(m_sidebar.settingsButton());
+        } else if (m_grid && m_navigator.route() == switchu::navigation::Route::Home) {
+            // Settings icon hidden (opened with -): go back to the games.
+            if (auto* target = m_grid->focusManager().current())
+                focusManager().setFocus(target);
+            updateCursor();
         }
     });
 

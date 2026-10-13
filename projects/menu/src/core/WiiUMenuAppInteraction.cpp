@@ -1387,6 +1387,12 @@ void WiiUMenuApp::wireGlobalActions() {
             return;
         if (handleAccessibilityToggleCombo())
             return;
+        // Minus on its own is the power pop-up (Settings > Home Screen), so
+        // the debug log needs L + R held as well.
+        if (!app().input().isDown(nxui::Button::L) && !app().input().isHeld(nxui::Button::L))
+            return;
+        if (!app().input().isDown(nxui::Button::R) && !app().input().isHeld(nxui::Button::R))
+            return;
         m_showDebugOverlay = !m_showDebugOverlay;
         DebugLog::log("[debug] ImGui overlay toggled: %d", m_showDebugOverlay ? 1 : 0);
     });

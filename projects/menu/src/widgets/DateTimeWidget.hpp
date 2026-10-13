@@ -18,6 +18,13 @@ public:
     void setClockService(switchu::services::ClockService* service) { m_clockService = service; }
     void setUse12HourClock(bool enabled);
     void setShowDate(bool show) { m_showDate = show; }
+    // true = 10/12/2026 (month first, US), false = 12/10/2026 (day first).
+    void setMonthFirst(bool monthFirst) {
+        if (m_monthFirst == monthFirst) return;
+        m_monthFirst = monthFirst;
+        m_timeStr.clear();
+        m_timer = 1.f;   // rebuild the text on the next update
+    }
 
     // Off draws only the text/icon, with no glass bubble behind it.
     void setBubbleVisible(bool visible) { m_bubbleVisible = visible; }
@@ -34,6 +41,7 @@ protected:
 private:
     bool m_bubbleVisible = true;
     bool m_showDate = true;
+    bool m_monthFirst = true;
     nxui::Font* m_font = nullptr;
     nxui::Font* m_smallFont = nullptr;
     float m_timer = 0.f;

@@ -112,8 +112,10 @@ bool AppConfig::load() {
     readJsonOpt(j, "homeShowHomebrewButton", homeShowHomebrewButton);
     readJsonOpt(j, "homeShowSleepButton", homeShowSleepButton);
     readJsonOpt(j, "homeShowThemesButton", homeShowThemesButton);
+    readJsonOpt(j, "homeShowSettingsButton", homeShowSettingsButton);
     readJsonOpt(j, "homeShowButtonHints", homeShowButtonHints);
     readJsonOpt(j, "homeShowDate", homeShowDate);
+    readJsonOpt(j, "homeDateFormat", homeDateFormat);
     readJsonOpt(j, "homeClockPosition", homeClockPosition);
     readJsonOpt(j, "homeShowClock", homeShowClock);
     readJsonOpt(j, "homeShowBattery", homeShowBattery);
@@ -170,8 +172,9 @@ bool AppConfig::load() {
     accessibilitySpeechRate = std::clamp(accessibilitySpeechRate, 120, 320);
     sortMode = std::clamp(sortMode, 0, 2);
     homeLineStyle = std::clamp(homeLineStyle, 0, 2);
-    homeClockPosition = std::clamp(homeClockPosition, 0, 2);
+    homeClockPosition = std::clamp(homeClockPosition, 0, 3);
     homeCoversShown = homeCoversShown >= 5 ? 5 : 3;
+    homeDateFormat = std::clamp(homeDateFormat, 0, 1);
     homePlusAction = std::clamp(homePlusAction, 0, 1);
     homeMinusAction = std::clamp(homeMinusAction, 0, 1);
     if (homeDefaultsVersion < kHomeDefaultsVersion) {
@@ -285,9 +288,11 @@ bool AppConfig::save() const {
     j["homeShowHomebrewButton"] = homeShowHomebrewButton;
     j["homeShowSleepButton"] = homeShowSleepButton;
     j["homeShowThemesButton"] = homeShowThemesButton;
+    j["homeShowSettingsButton"] = homeShowSettingsButton;
     j["homeShowButtonHints"] = homeShowButtonHints;
     j["homeShowDate"] = homeShowDate;
-    j["homeClockPosition"] = std::clamp(homeClockPosition, 0, 2);
+    j["homeDateFormat"] = std::clamp(homeDateFormat, 0, 1);
+    j["homeClockPosition"] = std::clamp(homeClockPosition, 0, 3);
     j["homeShowClock"] = homeShowClock;
     j["homeShowBattery"] = homeShowBattery;
     j["homeCoversShown"] = homeCoversShown >= 5 ? 5 : 3;

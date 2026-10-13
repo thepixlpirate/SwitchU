@@ -78,11 +78,18 @@ struct AppConfig {
     bool  homeShowHomebrewButton = false;     // Album / homebrew shortcut
     bool  homeShowSleepButton = false;        // Power menu shortcut
     bool  homeShowThemesButton = false;       // Theme shop shortcut
+    // Settings shortcut. Only hidden while - opens the power menu, so
+    // Settings can always be reached.
+    bool  homeShowSettingsButton = true;
     bool  homeShowButtonHints = false;        // bottom-right hints on the home screen
     bool  homeShowDate = false;               // date line under the clock
-    // 0 = clock in the top middle (original), 1 = clock beside the battery,
+    // 0 = month/day/year (US), 1 = day/month/year.
+    int   homeDateFormat = 0;
+    // 0 = top bar: clock top-left, Settings top-middle, battery top-right,
+    // 1 = clock beside the battery (top right),
     // 2 = bottom bar: clock bottom-left, Settings bottom-middle, battery
-    //     bottom-right.
+    //     bottom-right,
+    // 3 = original: clock in the top middle.
     int   homeClockPosition = 2;
     bool  homeShowClock = true;
     bool  homeShowBattery = true;

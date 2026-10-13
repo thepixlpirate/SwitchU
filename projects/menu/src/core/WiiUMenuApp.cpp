@@ -4478,6 +4478,32 @@ void WiiUMenuApp::buildGrid() {
     createControllerTest();
 
     m_overlayLayer->addChild(m_contextMenu);
+    m_coverBrowser = std::make_shared<CoverBrowser>(app().gpu(), app().renderer(), m_threadPool);
+    m_coverBrowser->setFont(&m_fontNormal);
+    m_coverBrowser->setSmallFont(&m_fontSmall);
+    m_coverBrowser->setTheme(&m_theme);
+    m_coverBrowser->onNavigate([this]() { m_audio.playSfx(Sfx::Navigate); });
+    m_coverBrowser->onActivate([this]() { m_audio.playSfx(Sfx::Activate); });
+    m_coverBrowser->onChoose([this](const std::string& choice) {
+        const std::uint64_t titleId = m_coverBrowserTitleId;
+        if (titleId == 0) return;
+        m_config.setCoverChoice(titleId, choice);
+        if (m_configSaveFuture.valid())
+            m_configSaveFuture.wait();
+        m_configSaveFuture = m_threadPool.submit([config = m_config]() { config.save(); });
+        reloadCover(titleId);
+        m_audio.playSfx(Sfx::ConfirmPositive);
+    });
+    m_coverBrowser->onClosed([this]() {
+        m_audio.playSfx(Sfx::ModalHide);
+        m_navigator.routeDidClose(switchu::navigation::Route::GameOptions);
+        if (m_grid) {
+            if (auto* target = m_grid->focusManager().current())
+                focusManager().setFocus(target);
+        }
+        updateCursor();
+    });
+    m_overlayLayer->addChild(m_coverBrowser);
     m_overlayLayer->addChild(m_dialog);
     m_overlayLayer->addChild(m_progressDialog);
     m_overlayLayer->addChild(m_launchAnim);
@@ -5632,7 +5658,11 @@ void WiiUMenuApp::onUpdateAwake(float dt) {
         !(m_controllerTest && m_controllerTest->isActive()) &&
         !(m_profileCarousel && m_profileCarousel->isActive()) &&
         !(m_userSelect && m_userSelect->isActive())) {
-        if (m_config.homeMinusAction == 0)
+        const bool debugCombo = app().input().isHeld(nxui::Button::L) &&
+                                app().input().isHeld(nxui::Button::R);
+        if (debugCombo)
+            ;   // L + R + Minus is the debug log toggle, not the power menu
+        else if (m_config.homeMinusAction == 0)
             showPowerMenu();
         else
             toggleAppLayoutMode();
@@ -5665,6 +5695,9 @@ void WiiUMenuApp::onUpdateAwake(float dt) {
         && !(m_profileCarousel && m_profileCarousel->isActive())
         && !(m_userSelect && m_userSelect->isActive())
         && !(m_progressDialog && m_progressDialog->isActive()))
+    if (m_coverBrowser && m_coverBrowser->isActive())
+        m_coverBrowser->handleTouch(app().input());
+    else
     {
         handleTouch();
     }
@@ -5855,6 +5888,8 @@ std::vector<WiiUMenuApp::ActionHint> WiiUMenuApp::buildActionHints() {
 
     if (m_textEntry && m_textEntry->isActive())
         return hints;
+    if (m_coverBrowser && m_coverBrowser->isActive())
+        return hints;   // the picker shows its own controls
 
     if (m_contextMenu && m_contextMenu->isActive()) {
         add(dpadGlyph(), i18n.tr("hint.navigate", "Navigate"));
