@@ -5,8 +5,10 @@
 void LaunchAnimation::start(const nxui::Rect& from, const nxui::Texture* tex, float cornerRadius,
                             const nxui::Color& panelColor, const nxui::Color& borderColor,
                             uint64_t titleId, AccountUid uid,
-                            LaunchCallback onLaunch, nxui::VoidCallback onDone)
+                            LaunchCallback onLaunch, nxui::VoidCallback onDone,
+                            bool flat)
 {
+    m_flat = flat;
     m_from         = from;
     m_tex          = tex;
     m_cornerRadius = cornerRadius;
@@ -23,6 +25,16 @@ void LaunchAnimation::start(const nxui::Rect& from, const nxui::Texture* tex, fl
     m_doneCalled   = false;
     m_postLaunchHold = false;
 
+    if (m_flat) {
+        // Grow ~15% and drift to the screen centre, keeping the shape.
+        constexpr float kGrow = 1.15f;
+        const float w = from.width * kGrow;
+        const float h = std::min(from.height * kGrow, 700.f);
+        const float wFit = h / std::max(1.f, from.height) * from.width;
+        m_target = {(1280.f - wFit) * 0.5f, (720.f - h) * 0.5f, wFit, h};
+        (void)w;
+        return;
+    }
     float side = std::min(from.width, from.height) * 1.8f;
     m_target = {(1280 - side) * 0.5f, (720 - side) * 0.5f, side, side};
 }
@@ -135,6 +147,21 @@ void LaunchAnimation::onRender(nxui::Renderer& ren) {
 
     float dimAlpha = 0.5f * ez * fadeAlpha;
     ren.drawRect({0, 0, 1280, 720}, nxui::Color(0, 0, 0, dimAlpha));
+
+    if (m_flat) {
+        if (m_tex && m_tex->valid()) {
+            // Crop the picture to the card's shape (never stretch it).
+            const float tw = static_cast<float>(m_tex->width());
+            const float th = static_cast<float>(m_tex->height());
+            nxui::Rect src{0.f, 0.f, tw, th};
+            const float want = animRect.width / std::max(1.f, animRect.height);
+            if (tw / th > want) { src.width = th * want; src.x = (tw - src.width) * 0.5f; }
+            else { src.height = tw / want; src.y = (th - src.height) * 0.5f; }
+            ren.drawTextureSubRounded(m_tex, src, animRect, 18.f,
+                                      nxui::Color::white().withAlpha(fadeAlpha));
+        }
+        return;
+    }
 
     nxui::Color body = m_panelColor.withAlpha(m_panelColor.a * fadeAlpha);
     ren.drawRoundedRect(animRect, body, cr);

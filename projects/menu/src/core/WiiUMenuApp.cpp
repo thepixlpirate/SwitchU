@@ -3686,15 +3686,31 @@ void WiiUMenuApp::activateApplication(GlossyIcon* source, AppEntry* entry,
         return;
     }
 
-    const nxui::Rect frame = source->focusRect();
+    nxui::Rect frame = source->focusRect();
     const nxui::Texture* texture = source->texture();
     const float radius = source->cornerRadius();
+    // Portrait row: zoom the cover that is on screen (tall, sharp) instead of
+    // the small square icon in a glass tile.
+    bool flatLaunch = false;
+    if (source->portraitStyle() && m_grid) {
+        flatLaunch = true;
+        if (m_grid->isDynamicLine())
+            frame = m_grid->focusedDisplayRect();
+        if (source->portraitTexture() && source->portraitTexture()->valid()) {
+            texture = source->portraitTexture();
+        } else {
+            // No cover: the square icon, centred where it is drawn on the card.
+            const float side = std::min(frame.width, frame.height);
+            frame = {frame.x + (frame.width - side) * 0.5f,
+                     frame.y + (frame.height - side) * 0.5f, side, side};
+        }
+    }
     const nxui::Color base = m_theme.panelBase;
     const nxui::Color border = m_theme.panelBorder;
     auto startLaunch = [this, frame, texture, radius, base, border,
-                        titleId, launchTitle](AccountUid uid) {
+                        titleId, launchTitle, flatLaunch](AccountUid uid) {
         scheduleLeaveCapture([this, frame, texture, radius, base, border,
-                              titleId, launchTitle, uid]() {
+                              titleId, launchTitle, uid, flatLaunch]() {
             m_audio.playSfx(Sfx::LaunchGame);
             m_launchAnim->start(frame, texture, radius, base, border, titleId, uid,
                 [this, launchTitle](std::uint64_t id, AccountUid selectedUid) {
@@ -3704,7 +3720,7 @@ void WiiUMenuApp::activateApplication(GlossyIcon* source, AppEntry* entry,
                         static_cast<std::int64_t>(std::time(nullptr)));
                     m_widgetStore.save();
                     m_launcher.launchApplication(id, selectedUid);
-                });
+                }, {}, flatLaunch);
         }, titleId);
     };
 

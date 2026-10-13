@@ -23,8 +23,9 @@ namespace {
 constexpr const char* kIconSwapFolder = "sdmc:/iconswap";
 constexpr const char* kPortraitFolder = "sdmc:/config/SwitchU/portraits";
 // Decoded size of one cover. The focused card is at most ~290x432 on screen.
-constexpr int kPortraitDecodeW = 300;
-constexpr int kPortraitDecodeH = 450;
+// Big enough for the largest card (360x540) to stay sharp.
+constexpr int kPortraitDecodeW = 400;
+constexpr int kPortraitDecodeH = 600;
 // Covers kept around the focused game: a little behind, more ahead.
 constexpr int kPortraitKeepBehind = 3;
 constexpr int kPortraitKeepAhead = 8;

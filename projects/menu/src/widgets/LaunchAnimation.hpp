@@ -18,7 +18,8 @@ public:
     void start(const nxui::Rect& from, const nxui::Texture* tex, float cornerRadius,
                const nxui::Color& panelColor, const nxui::Color& borderColor,
                uint64_t titleId, AccountUid uid,
-               LaunchCallback onLaunch = {}, nxui::VoidCallback onDone = {});
+               LaunchCallback onLaunch = {}, nxui::VoidCallback onDone = {},
+               bool flat = false);
 
     // Resume an already-open title: brief fade to black, then onDone.
     void startResume(nxui::VoidCallback onDone);
@@ -69,4 +70,7 @@ private:
     bool    m_launched = false;
     bool    m_doneCalled = false;
     bool    m_postLaunchHold = false;
+    // Cover style: the picture keeps its own shape and only grows a little,
+    // so a tall cover stays tall and sharp (no glass tile around it).
+    bool    m_flat = false;
 };
