@@ -220,6 +220,7 @@ void WiiUMenuApp::pushHomeOptionsToSettings() {
     home.coverShape = m_config.homeSquareCovers ? 1 : 0;
     home.sortMode = m_config.sortMode;
     home.homeButtonSortMenu = m_config.homeButtonSortMenu;
+    home.showArchived = m_config.homeShowArchived;
     home.showDate = m_config.homeShowDate;
     home.dateFormat = m_config.homeDateFormat;
     home.plusAction = m_config.homePlusAction;
@@ -271,6 +272,10 @@ void WiiUMenuApp::applyHomeOption(const std::string& key, int value) {
     else if (key == "coversShown")           m_config.homeCoversShown = value >= 1 ? 5 : 3;
     else if (key == "coverShape")            m_config.homeSquareCovers = value == 1;
     else if (key == "homeButtonSortMenu")    m_config.homeButtonSortMenu = on;
+    else if (key == "showArchived") {
+        m_config.homeShowArchived = on;
+        m_homeRebuildPending = true;   // applied when Settings closes
+    }
     else if (key == "showDate")              m_config.homeShowDate = on;
     else if (key == "dateFormat")            m_config.homeDateFormat = std::clamp(value, 0, 1);
     else if (key == "plusAction")            m_config.homePlusAction = std::clamp(value, 0, 1);
@@ -318,12 +323,30 @@ void WiiUMenuApp::syncPortraitTitlePlacement() {
 // Hidden games
 // ---------------------------------------------------------------------------
 
+bool WiiUMenuApp::isArchivedEntry(const AppEntry& entry) const {
+    if (!entry.isApplication() || entry.titleId == 0)
+        return false;
+    // Deleted on this run: hide straight away, before the console's list
+    // catches up.
+    if (m_deletedTitles.count(entry.titleId))
+        return true;
+    const std::uint32_t flags = entry.viewFlags;
+    if (flags == 0)
+        return false;   // status unknown: keep it
+    if (switchu::ns::viewHasFlag(flags, switchu::ns::AppViewFlag_IsGameCard) ||
+        switchu::ns::viewHasFlag(flags, switchu::ns::AppViewFlag_IsDownloading))
+        return false;
+    return !switchu::ns::viewHasFlag(flags, switchu::ns::AppViewFlag_HasMainContents);
+}
+
 void WiiUMenuApp::dropHiddenTitles(GridModel& model) const {
-    if (m_config.hiddenTitles.empty())
+    const bool dropArchived = !m_config.homeShowArchived;
+    if (m_config.hiddenTitles.empty() && !dropArchived)
         return;
     for (int i = 0; i < model.count(); ++i) {
         const AppEntry& entry = model.at(i);
-        if (entry.isApplication() && m_config.isTitleHidden(entry.titleId))
+        if (!entry.isApplication()) continue;
+        if (m_config.isTitleHidden(entry.titleId) || (dropArchived && isArchivedEntry(entry)))
             model.at(i) = AppEntry{};
     }
 }
@@ -1063,4 +1086,31 @@ void WiiUMenuApp::pollHomeBackground() {
     }
     // The choice may have changed again while this was decoding.
     applyHomeBackground();
+}
+
+void WiiUMenuApp::updateTriggerRepeat(float dt) {
+    auto& input = app().input();
+    const bool left = input.isHeld(nxui::Button::ZL);
+    const bool right = input.isHeld(nxui::Button::ZR);
+    const bool usable = (left != right) && m_grid &&
+        m_appLayoutMode == AppLayoutMode::DynamicLine && !m_editMode &&
+        m_navigator.route() == switchu::navigation::Route::Home &&
+        focusRoot() == &rootBox();
+    if (!usable) {
+        m_triggerHoldTime = 0.f;
+        m_triggerRepeatTimer = 0.f;
+        return;
+    }
+    // The first jump comes from the button press itself; after a short pause
+    // keep jumping while the trigger stays held, a little faster over time.
+    constexpr float kDelay = 0.35f;
+    m_triggerHoldTime += dt;
+    if (m_triggerHoldTime < kDelay)
+        return;
+    const float interval = m_triggerHoldTime > 2.0f ? 0.09f : 0.16f;
+    m_triggerRepeatTimer -= dt;
+    if (m_triggerRepeatTimer > 0.f)
+        return;
+    m_triggerRepeatTimer = interval;
+    jumpLine(right ? +1 : -1);
 }

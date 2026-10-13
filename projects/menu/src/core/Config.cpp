@@ -132,6 +132,7 @@ bool AppConfig::load() {
     readJsonOpt(j, "homeShowBattery", homeShowBattery);
     readJsonOpt(j, "homeCoversShown", homeCoversShown);
     readJsonOpt(j, "homeSquareCovers", homeSquareCovers);
+    readJsonOpt(j, "homeShowArchived", homeShowArchived);
     readJsonOpt(j, "homeHighlightHex", homeHighlightHex);
     readJsonOpt(j, "homeBackgroundMode", homeBackgroundMode);
     readJsonOpt(j, "homeBackgroundHex", homeBackgroundHex);
@@ -326,6 +327,7 @@ bool AppConfig::save() const {
     j["homeShowBattery"] = homeShowBattery;
     j["homeCoversShown"] = homeCoversShown >= 5 ? 5 : 3;
     j["homeSquareCovers"] = homeSquareCovers;
+    j["homeShowArchived"] = homeShowArchived;
     j["homeHighlightHex"] = homeHighlightHex;
     j["homeBackgroundMode"] = std::clamp(homeBackgroundMode, 0, 2);
     j["homeBackgroundHex"] = homeBackgroundHex;

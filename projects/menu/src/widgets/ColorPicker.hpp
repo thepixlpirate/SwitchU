@@ -53,6 +53,7 @@ private:
     float swatchRadius(int ring) const;
     void moveSelection(int dRing, int dHue);
     void selectNearest(const nxui::Color& color);
+    void applyAndClose();
 
     nxui::Font* m_font = nullptr;
     nxui::Font* m_smallFont = nullptr;

@@ -61,6 +61,7 @@ public:
         int  coverShape = 0;         // 0 = portrait 2:3, 1 = square 1:1
         int  sortMode = 0;           // see AppConfig::sortMode
         bool homeButtonSortMenu = true;
+        bool showArchived = false;
         bool showDate = false;
         int  dateFormat = 0;         // 0 = month/day/year, 1 = day/month/year
         int  plusAction = 0;         // 0 = quick popup, 1 = full options

@@ -68,6 +68,7 @@
 #include <utility>
 #include <functional>
 #include <unordered_map>
+#include <unordered_set>
 #include <switch.h>
 #ifdef SWITCHU_MENU
 #include <switchu/smi_protocol.hpp>
@@ -376,6 +377,7 @@ private:
     void hideTitle(std::uint64_t titleId);
     void unhideTitle(std::uint64_t titleId);
     void dropHiddenTitles(GridModel& model) const;
+    bool isArchivedEntry(const AppEntry& entry) const;
     std::vector<std::pair<std::uint64_t, std::string>> hiddenGamesForSettings() const;
     void pushHomeOptionsToSettings();
     void layoutTopHud();
@@ -389,6 +391,10 @@ private:
     // ZL/ZR in the single row: jump a whole screen of games. False when not
     // in the single row (the grid then flips pages as before).
     bool jumpLine(int direction);
+    // Holding ZL/ZR keeps jumping until released.
+    void updateTriggerRepeat(float dt);
+    float m_triggerHoldTime = 0.f;
+    float m_triggerRepeatTimer = 0.f;
     // HOME pressed while already on the menu: sort pop-up.
     void showSortMenu();
     void applySortMode(int mode);
@@ -464,6 +470,7 @@ private:
     std::shared_ptr<CoverBrowser>      m_coverBrowser;
     std::uint64_t                      m_coverBrowserTitleId = 0;
     bool                               m_softwareDeleteFromHome = false;
+    std::unordered_set<std::uint64_t>  m_deletedTitles;   // deleted this run
     bool                               m_browserForBackground = false;
     std::shared_ptr<ColorPicker>       m_colorPicker;
     std::string                        m_colorPickerTarget;   // "highlight" | "background"

@@ -111,6 +111,9 @@ struct AppConfig {
     // Card shape in the portrait styles: false = tall 2:3 covers,
     // true = square 1:1 game icons.
     bool  homeSquareCovers = false;
+    // Deleted games stay on the console as "archived" records (the Switch's
+    // own HOME shows them with a cloud). Off = leave them out of the row.
+    bool  homeShowArchived = false;
     // Outline around the selected game (Themes > Options).
     std::string homeHighlightHex = "#7A1FA8";
     // HOME background: 0 = the theme's own, 1 = solid colour, 2 = picture.

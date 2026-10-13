@@ -12,6 +12,10 @@ namespace {
 constexpr float kPi = 3.14159265f;
 const nxui::Rect kPanel{250.f, 70.f, 780.f, 580.f};
 const nxui::Vec2 kWheelCenter{kPanel.x + 260.f, kPanel.y + 310.f};
+// Tappable buttons under the preview.
+const nxui::Rect kApplyButton{kPanel.x + 540.f, kPanel.y + 480.f, 200.f, 48.f};
+const nxui::Rect kCancelButton{kPanel.x + 540.f, kPanel.y + 400.f, 200.f, 48.f};
+const nxui::Rect kHexButton{kPanel.x + 540.f, kPanel.y + 330.f, 200.f, 48.f};
 constexpr float kRingRadius[] = {205.f, 160.f, 116.f, 74.f};   // outer -> inner
 constexpr float kSwatchRadius[] = {24.f, 20.f, 15.f, 10.f};
 
@@ -55,13 +59,7 @@ ColorPicker::ColorPicker() {
     addDirectionAction(nxui::FocusDirection::RIGHT, [this]() { moveSelection(0, 1); });
     addDirectionAction(nxui::FocusDirection::UP, [this]() { moveSelection(-1, 0); });
     addDirectionAction(nxui::FocusDirection::DOWN, [this]() { moveSelection(1, 0); });
-    addAction(static_cast<std::uint64_t>(nxui::Button::A), [this]() {
-        if (!m_active) return;
-        auto cb = m_onApply;
-        const std::string value = hex();
-        close();
-        if (cb) cb(value);
-    });
+    addAction(static_cast<std::uint64_t>(nxui::Button::A), [this]() { applyAndClose(); });
     addAction(static_cast<std::uint64_t>(nxui::Button::B), [this]() { close(); });
     addAction(static_cast<std::uint64_t>(nxui::Button::X), [this]() {
         if (m_active && m_onTypeHex) m_onTypeHex();
@@ -180,10 +178,21 @@ void ColorPicker::moveSelection(int dRing, int dHue) {
     if (m_onNavigate) m_onNavigate();
 }
 
+void ColorPicker::applyAndClose() {
+    if (!m_active) return;
+    auto cb = m_onApply;
+    const std::string value = hex();
+    close();
+    if (cb) cb(value);
+}
+
 void ColorPicker::handleTouch(nxui::Input& input) {
     if (!m_active || !input.touchUp()) return;
     const float x = input.touchX(), y = input.touchY();
     if (!kPanel.contains(x, y)) { close(); return; }
+    if (kApplyButton.contains(x, y)) { applyAndClose(); return; }
+    if (kCancelButton.contains(x, y)) { close(); return; }
+    if (kHexButton.contains(x, y)) { if (m_onTypeHex) m_onTypeHex(); return; }
     auto hit = [&](int ring, int hue) {
         const nxui::Vec2 c = swatchCenter(ring, hue);
         const float r = swatchRadius(ring) + 4.f;
@@ -242,29 +251,37 @@ void ColorPicker::render(nxui::Renderer& ren) {
     const nxui::Color chosen = m_custom ? m_customColor : swatchColor(m_ring, m_hue);
     const float px = kPanel.x + 540.f;
     if (m_preview == Preview::Outline) {
-        const nxui::Rect card{px + 30.f, kPanel.y + 110.f, 140.f, 210.f};
+        const nxui::Rect card{px + 30.f, kPanel.y + 90.f, 140.f, 210.f};
         ren.drawRoundedRect(card, nxui::Color(0.2f, 0.2f, 0.24f, alpha), 14.f);
         ren.drawRoundedRectOutline(card.expanded(6.f), chosen.withAlpha(alpha), 20.f, 6.f);
     } else {
-        const nxui::Rect screen{px, kPanel.y + 140.f, 200.f, 112.f};
+        const nxui::Rect screen{px, kPanel.y + 160.f, 200.f, 112.f};
         ren.drawRoundedRect(screen.expanded(3.f), secondary.withAlpha(0.6f * alpha), 12.f);
         ren.drawRoundedRect(screen, chosen.withAlpha(alpha), 10.f);
     }
-    if (m_font) {
-        const std::string value = hex();
-        ren.drawText(value, {px + 20.f, kPanel.y + 350.f}, m_font, primary.withAlpha(alpha), 0.9f);
-    }
-    if (m_smallFont) {
-        auto& i18n = nxui::I18n::instance();
-        const float s = 0.62f;
-        float y = kPanel.y + 410.f;
-        for (const std::string& line : {
-                 i18n.tr("color.help_move", "D-pad  Pick a colour"),
-                 i18n.tr("color.help_hex", "X  Type a hex code"),
-                 i18n.tr("color.help_apply", "A  Apply"),
-                 i18n.tr("color.help_cancel", "B  Cancel")}) {
-            ren.drawText(line, {px, y}, m_smallFont, secondary.withAlpha(alpha), s);
-            y += 28.f;
-        }
-    }
+    // Buttons (tap them, or use X / B / A).
+    auto& i18n = nxui::I18n::instance();
+    nxui::Font* bf = m_smallFont ? m_smallFont : m_font;
+    auto button = [&](const nxui::Rect& r, const std::string& label, bool primaryButton) {
+        ren.drawRoundedRect(r, primaryButton ? chosen.withAlpha(alpha)
+                                             : secondary.withAlpha(0.25f * alpha), 14.f);
+        ren.drawRoundedRectOutline(r, secondary.withAlpha(0.6f * alpha), 14.f, 1.5f);
+        if (!bf) return;
+        const float s = 0.7f;
+        const nxui::Vec2 m = bf->measure(label);
+        // Dark text on light colours, white text on dark ones.
+        const float lum = 0.299f * chosen.r + 0.587f * chosen.g + 0.114f * chosen.b;
+        const nxui::Color text = primaryButton
+            ? (lum > 0.6f ? nxui::Color(0.08f, 0.08f, 0.1f, alpha) : nxui::Color::white().withAlpha(alpha))
+            : primary.withAlpha(alpha);
+        ren.drawText(label, {r.x + (r.width - m.x * s) * 0.5f, r.y + (r.height - m.y * s) * 0.5f},
+                     bf, text, s);
+    };
+    button(kHexButton, hex() + "   (X)", false);
+    button(kCancelButton, i18n.tr("color.cancel", "Cancel  (B)"), false);
+    button(kApplyButton, i18n.tr("color.apply", "Apply  (A)"), true);
+    if (m_smallFont)
+        ren.drawText(i18n.tr("color.help_move", "D-pad: pick a colour"),
+                     {kPanel.x + 30.f, kPanel.y + kPanel.height - 34.f}, m_smallFont,
+                     secondary.withAlpha(alpha), 0.6f);
 }

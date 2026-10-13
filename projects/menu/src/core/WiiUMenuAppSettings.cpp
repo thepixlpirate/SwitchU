@@ -1722,6 +1722,8 @@ void WiiUMenuApp::createThemeShop() {
         focusManager().setFocus(m_dialog.get());
     });
     m_themeShop->onClosed([this, clearCompletedThemeTransferState]() {
+        if (m_colorPicker && m_colorPicker->isActive()) m_colorPicker->close();
+        if (m_coverBrowser && m_coverBrowser->isActive()) m_coverBrowser->close();
         m_navigator.routeDidClose(switchu::navigation::Route::ThemeShop);
         if (m_configSaveFuture.valid())
             m_configSaveFuture.wait();
@@ -2711,8 +2713,12 @@ void WiiUMenuApp::syncSoftwareDeletion() {
         DebugLog::log("[software-delete] complete: %s", m_softwareDeleteTitle.c_str());
         // Drop NACP/icon cache so a reinstall with a new icon is not stuck
         // on the previous control_cache entry.
-        if (m_softwareDeleteTitleId != 0)
+        if (m_softwareDeleteTitleId != 0) {
             switchu::control_cache::remove(m_softwareDeleteTitleId);
+            // Close the gap right away; the console's list may lag behind.
+            m_deletedTitles.insert(m_softwareDeleteTitleId);
+            m_homeRebuildPending = true;
+        }
         m_audio.playSfx(Sfx::ConfirmPositive);
         if (m_softwareDeleteClosesGameOptions && m_gameOptions) {
             m_gameOptions->hide();

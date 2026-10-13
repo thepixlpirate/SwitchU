@@ -1212,6 +1212,8 @@ void WiiUMenuApp::closeActiveOverlays(bool closeFolders) {
         m_contextMenu->hide();
     if (m_coverBrowser && m_coverBrowser->isActive())
         m_coverBrowser->close();
+    if (m_colorPicker && m_colorPicker->isActive())
+        m_colorPicker->close();
     if (m_dialog && m_dialog->isActive())
         m_dialog->hide();
     if (m_quickSettings && m_quickSettings->isActive())
@@ -1248,6 +1250,10 @@ nxui::Widget* WiiUMenuApp::focusRoot() {
     if (m_textEntry && m_textEntry->isActive()) return m_textEntry.get();
     if (m_dialog && m_dialog->isActive()) return m_dialog.get();
     if (m_contextMenu && m_contextMenu->isActive()) return m_contextMenu.get();
+    // The picture browser and colour wheel sit on top of other windows, so
+    // they must receive the buttons first (the keyboard above still wins).
+    if (m_colorPicker && m_colorPicker->isActive()) return m_colorPicker.get();
+    if (m_coverBrowser && m_coverBrowser->isActive()) return m_coverBrowser.get();
     if (m_quickSettings && m_quickSettings->isActive()) return m_quickSettings.get();
     if (m_userSelect && m_userSelect->isActive()) return m_userSelect.get();
     if (m_steamGridDbPicker && m_steamGridDbPicker->isActive())

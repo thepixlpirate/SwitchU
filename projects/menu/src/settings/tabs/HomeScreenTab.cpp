@@ -165,6 +165,11 @@ SettingsScreen::Tab settings::tabs::HomeScreenTab::build(SettingsScreen& screen)
                  i18n.tr("settings.home.sort_newest", "Newest Added"),
                  i18n.tr("settings.home.sort_oldest", "Oldest Added")},
                 "sortMode", &S::sortMode);
+    addToggle(i18n.tr("settings.home.show_archived", "Show Deleted (Archived) Games"),
+              i18n.tr("settings.home.show_archived_desc",
+                      "A deleted game stays on the console as an archived entry. Off leaves them "
+                      "out of the row (game cards are always shown)."),
+              "showArchived", &S::showArchived);
     addToggle(i18n.tr("settings.home.home_sort", "HOME Button Opens Sort Menu"),
               i18n.tr("settings.home.home_sort_desc",
                       "Press HOME on the Home screen to change how games are sorted."),

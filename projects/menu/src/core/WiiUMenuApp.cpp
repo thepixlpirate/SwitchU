@@ -5151,6 +5151,7 @@ void WiiUMenuApp::onUpdateAwake(float dt) {
     syncPortraitTitlePlacement();
     processPendingHomeRebuild();
     pollHomeBackground();
+    updateTriggerRepeat(dt);
     syncFolderHeader();
 
 #ifdef NXUI_BACKEND_DEKO3D
@@ -5583,6 +5584,16 @@ void WiiUMenuApp::onUpdateAwake(float dt) {
                 uint64_t tid = notif.app_id;
                 uint32_t flags = notif.payload;
                 m_model.updateViewFlags(tid, flags);
+                // Keep the source list in step so a rebuild sees the change
+                // (a game whose contents were deleted becomes archived).
+                for (auto& app : m_allApps) {
+                    if (app.titleId != tid) continue;
+                    const bool wasArchived = isArchivedEntry(app);
+                    app.viewFlags = flags;
+                    if (wasArchived != isArchivedEntry(app))
+                        m_homeRebuildPending = true;
+                    break;
+                }
                 for (auto& icon : m_grid->allIcons()) {
                     if (icon->titleId() == tid) {
                         bool launchable = (flags == 0) ||
