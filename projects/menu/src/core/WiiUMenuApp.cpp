@@ -1632,7 +1632,33 @@ void WiiUMenuApp::composeRootPending(std::vector<PendingApp>& apps) {
         m_layoutDirty = true;
     }
 
-    apps = std::move(ordered);
+    // Startup and every catalogue refresh come through here, not through
+    // buildRootFolderModel(), so hidden and deleted (archived) games must be
+    // dropped here too. In the single row every empty slot is removed as
+    // well: an empty slot is invisible but still takes a place in the row,
+    // which is what showed up as a gap.
+    const bool singleRow = m_appLayoutMode == AppLayoutMode::DynamicLine;
+    std::vector<PendingApp> visible;
+    visible.reserve(ordered.size());
+    for (auto& item : ordered) {
+        if (item.kind == GridEntryKind::Application &&
+            (m_config.isTitleHidden(item.titleId) ||
+             (!m_config.homeShowArchived && isArchivedTitle(item.titleId, item.viewFlags)))) {
+            if (singleRow) continue;
+            PendingApp empty;
+            empty.kind = GridEntryKind::Empty;
+            visible.push_back(std::move(empty));
+            continue;
+        }
+        if (singleRow && (item.kind == GridEntryKind::Empty ||
+                          item.kind == GridEntryKind::WidgetContinuation))
+            continue;
+        visible.push_back(std::move(item));
+    }
+    apps = std::move(visible);
+    // The chosen sort order is applied by the normal HOME rebuild.
+    if (m_config.sortMode != 0)
+        m_homeRebuildPending = true;
 }
 
 GridModel WiiUMenuApp::buildRootFolderModel() {

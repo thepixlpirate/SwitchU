@@ -378,6 +378,7 @@ private:
     void unhideTitle(std::uint64_t titleId);
     void dropHiddenTitles(GridModel& model) const;
     bool isArchivedEntry(const AppEntry& entry) const;
+    bool isArchivedTitle(std::uint64_t titleId, std::uint32_t viewFlags) const;
     std::vector<std::pair<std::uint64_t, std::string>> hiddenGamesForSettings() const;
     void pushHomeOptionsToSettings();
     void layoutTopHud();

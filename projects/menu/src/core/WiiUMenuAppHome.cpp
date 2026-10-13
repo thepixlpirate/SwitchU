@@ -325,13 +325,18 @@ void WiiUMenuApp::syncPortraitTitlePlacement() {
 // ---------------------------------------------------------------------------
 
 bool WiiUMenuApp::isArchivedEntry(const AppEntry& entry) const {
-    if (!entry.isApplication() || entry.titleId == 0)
+    if (!entry.isApplication())
+        return false;
+    return isArchivedTitle(entry.titleId, entry.viewFlags);
+}
+
+bool WiiUMenuApp::isArchivedTitle(std::uint64_t titleId, std::uint32_t flags) const {
+    if (titleId == 0)
         return false;
     // Deleted on this run: hide straight away, before the console's list
     // catches up.
-    if (m_deletedTitles.count(entry.titleId))
+    if (m_deletedTitles.count(titleId))
         return true;
-    const std::uint32_t flags = entry.viewFlags;
     if (flags == 0)
         return false;   // status unknown: keep it
     if (switchu::ns::viewHasFlag(flags, switchu::ns::AppViewFlag_IsGameCard) ||
