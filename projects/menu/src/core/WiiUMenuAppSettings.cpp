@@ -1609,6 +1609,9 @@ void WiiUMenuApp::createThemeShop() {
         m_config.actionHintStyle = style == 0 ? "panel" : "capsules";
     });
     m_themeShop->onAutoThemeOpen([this]() { openAutoThemeSettings(); });
+    m_themeShop->onHomeStyleAction([this](const std::string& action, int value) {
+        handleHomeStyleAction(action, value);
+    });
     m_themeShop->onCursorMotionModeChange([this](int mode) {
         m_config.cursorMotionMode = std::clamp(mode, 0, 1);
         const bool instant = m_config.cursorMotionMode == 1;
@@ -1960,6 +1963,10 @@ std::vector<ThemeShopScreen::ThemeShopEntry> WiiUMenuApp::buildThemeShopEntries(
 
 void WiiUMenuApp::refreshThemeShopState() {
     if (!m_themeShop) return;
+    m_themeShop->setHomeStyleState({m_config.homeHighlightHex, m_config.homeBackgroundMode,
+                                    m_config.homeBackgroundHex,
+                                    std::filesystem::path(m_config.homeBackgroundImage)
+                                        .filename().string()});
 
     ThemePreset* activePreset = findPresetPtr(m_activePresetName);
     std::string activeId = activePreset ? (activePreset->id.empty() ? activePreset->name : activePreset->id)
@@ -2709,6 +2716,8 @@ void WiiUMenuApp::syncSoftwareDeletion() {
         m_audio.playSfx(Sfx::ConfirmPositive);
         if (m_softwareDeleteClosesGameOptions && m_gameOptions) {
             m_gameOptions->hide();
+        } else if (m_softwareDeleteFromHome) {
+            // Deleted from the + pop-up on HOME: stay on the games.
         } else if (m_settings) {
             m_settings->requestToast(
                 i18n.tr("settings.storage.uninstall_success", "Uninstalled successfully."), 2.8f);
@@ -2736,4 +2745,5 @@ void WiiUMenuApp::syncSoftwareDeletion() {
     m_softwareDeleteTitleId = 0;
     m_softwareDeleteTitle.clear();
     m_softwareDeleteClosesGameOptions = false;
+    m_softwareDeleteFromHome = false;
 }

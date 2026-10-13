@@ -136,9 +136,10 @@ nxui::Rect CoverBrowser::tileRect(int index) const {
             kThumbW, kThumbH + kLabelH};
 }
 
-void CoverBrowser::open(const std::string& gameTitle, const std::string& startDirectory,
-                        const std::string& currentChoice) {
-    m_gameTitle = gameTitle;
+void CoverBrowser::open(const std::string& heading, const std::string& startDirectory,
+                        const std::string& currentChoice, bool coverChoices) {
+    m_gameTitle = heading;
+    m_coverChoices = coverChoices;
     m_currentChoice = currentChoice;
     m_active = true;
     setVisible(true);
@@ -182,8 +183,10 @@ void CoverBrowser::loadDirectory(const std::string& directory, const std::string
             (slash == std::string::npos || slash <= 5) ? std::string("sdmc:/") : dir.substr(0, slash);
         m_entries.push_back({Kind::Up, i18n.tr("browser.back_folder", "Back"), parent});
     }
-    m_entries.push_back({Kind::Automatic, i18n.tr("game.cover_auto", "Automatic"), ""});
-    m_entries.push_back({Kind::Original, i18n.tr("game.cover_icon", "Original Icon"), "icon"});
+    if (m_coverChoices) {
+        m_entries.push_back({Kind::Automatic, i18n.tr("game.cover_auto", "Automatic"), ""});
+        m_entries.push_back({Kind::Original, i18n.tr("game.cover_icon", "Original Icon"), "icon"});
+    }
 
     std::vector<Entry> folders, images;
     std::error_code ec;
@@ -513,8 +516,7 @@ void CoverBrowser::render(nxui::Renderer& renderer) {
     auto& i18n = nxui::I18n::instance();
 
     if (m_font) {
-        const std::string title = i18n.tr("game.quick.change_icon", "Change Icon")
-            + (m_gameTitle.empty() ? std::string() : "  -  " + m_gameTitle);
+        const std::string title = m_gameTitle;
         renderer.drawText(fitText(m_font, title, panel.width - 60.f, 0.8f),
                           {panel.x + 30.f, panel.y + 20.f}, m_font, primary.withAlpha(alpha), 0.8f);
     }

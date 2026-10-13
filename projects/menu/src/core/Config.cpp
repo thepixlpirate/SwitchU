@@ -95,6 +95,17 @@ bool AppConfig::load() {
     readJsonOpt(j, "steamGridDbShowInFolders", steamGridDbShowInFolders);
     readJsonOpt(j, "steamGridDbApiKey", steamGridDbApiKey);
     readJsonOpt(j, "sortMode", sortMode);
+    readJsonOpt(j, "homeButtonSortMenu", homeButtonSortMenu);
+    readJsonOpt(j, "firstSeenSequence", firstSeenSequence);
+    firstSeen.clear();
+    if (auto it = j.find("firstSeen"); it != j.end() && it->is_object()) {
+        for (auto& [key, value] : it->items()) {
+            if (!value.is_number_unsigned()) continue;
+            const auto titleId = std::strtoull(key.c_str(), nullptr, 16);
+            if (titleId != 0)
+                firstSeen.emplace_back(titleId, value.get<std::uint64_t>());
+        }
+    }
     readJsonOpt(j, "lastOpenedSequence", lastOpenedSequence);
     lastOpened.clear();
     if (auto it = j.find("lastOpened"); it != j.end() && it->is_object()) {
@@ -120,6 +131,11 @@ bool AppConfig::load() {
     readJsonOpt(j, "homeShowClock", homeShowClock);
     readJsonOpt(j, "homeShowBattery", homeShowBattery);
     readJsonOpt(j, "homeCoversShown", homeCoversShown);
+    readJsonOpt(j, "homeSquareCovers", homeSquareCovers);
+    readJsonOpt(j, "homeHighlightHex", homeHighlightHex);
+    readJsonOpt(j, "homeBackgroundMode", homeBackgroundMode);
+    readJsonOpt(j, "homeBackgroundHex", homeBackgroundHex);
+    readJsonOpt(j, "homeBackgroundImage", homeBackgroundImage);
     readJsonOpt(j, "homePlusAction", homePlusAction);
     readJsonOpt(j, "homeMinusAction", homeMinusAction);
     readJsonOpt(j, "homeLineStyle", homeLineStyle);
@@ -170,11 +186,12 @@ bool AppConfig::load() {
     if (soundPreset.empty()) soundPreset = "wiiu";
     if (!defaultProfileEnabled) defaultProfileUid.clear();
     accessibilitySpeechRate = std::clamp(accessibilitySpeechRate, 120, 320);
-    sortMode = std::clamp(sortMode, 0, 2);
+    sortMode = std::clamp(sortMode, 0, 5);
     homeLineStyle = std::clamp(homeLineStyle, 0, 2);
     homeClockPosition = std::clamp(homeClockPosition, 0, 3);
     homeCoversShown = homeCoversShown >= 5 ? 5 : 3;
     homeDateFormat = std::clamp(homeDateFormat, 0, 1);
+    homeBackgroundMode = std::clamp(homeBackgroundMode, 0, 2);
     homePlusAction = std::clamp(homePlusAction, 0, 1);
     homeMinusAction = std::clamp(homeMinusAction, 0, 1);
     if (homeDefaultsVersion < kHomeDefaultsVersion) {
@@ -269,7 +286,19 @@ bool AppConfig::save() const {
     j["steamGridDbShowInDynamicLine"] = steamGridDbShowInDynamicLine;
     j["steamGridDbShowInFolders"] = steamGridDbShowInFolders;
     j["steamGridDbApiKey"] = steamGridDbApiKey;
-    j["sortMode"] = std::clamp(sortMode, 0, 2);
+    j["sortMode"] = std::clamp(sortMode, 0, 5);
+    j["homeButtonSortMenu"] = homeButtonSortMenu;
+    j["firstSeenSequence"] = firstSeenSequence;
+    {
+        nlohmann::json seen = nlohmann::json::object();
+        char key[17];
+        for (const auto& entry : firstSeen) {
+            std::snprintf(key, sizeof(key), "%016llX",
+                          static_cast<unsigned long long>(entry.first));
+            seen[key] = entry.second;
+        }
+        j["firstSeen"] = std::move(seen);
+    }
     j["lastOpenedSequence"] = lastOpenedSequence;
     {
         nlohmann::json opened = nlohmann::json::object();
@@ -296,6 +325,11 @@ bool AppConfig::save() const {
     j["homeShowClock"] = homeShowClock;
     j["homeShowBattery"] = homeShowBattery;
     j["homeCoversShown"] = homeCoversShown >= 5 ? 5 : 3;
+    j["homeSquareCovers"] = homeSquareCovers;
+    j["homeHighlightHex"] = homeHighlightHex;
+    j["homeBackgroundMode"] = std::clamp(homeBackgroundMode, 0, 2);
+    j["homeBackgroundHex"] = homeBackgroundHex;
+    j["homeBackgroundImage"] = homeBackgroundImage;
     j["homePlusAction"] = std::clamp(homePlusAction, 0, 1);
     j["homeMinusAction"] = std::clamp(homeMinusAction, 0, 1);
     j["homeLineStyle"] = std::clamp(homeLineStyle, 0, 2);

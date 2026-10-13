@@ -69,6 +69,16 @@ void IconGrid::setLineStyle(int style) {
     }
 }
 
+void IconGrid::setSquareCovers(bool square) {
+    if (m_squareCovers == square) return;
+    m_squareCovers = square;
+    m_lineLayoutCacheCount = -1;
+    if (m_layoutMode == AppLayoutMode::DynamicLine) {
+        for (int i = 0; i < (int)m_allIcons.size(); ++i)
+            if (m_allIcons[i]) m_allIcons[i]->setRect(dynamicIconRect(i));
+    }
+}
+
 void IconGrid::setCenteredLayout(int coversShown, bool barAtBottom) {
     m_centerShown = coversShown >= 5 ? 5 : 3;
     m_centerBarBottom = barAtBottom;
@@ -90,13 +100,22 @@ IconGrid::CenteredMetrics IconGrid::centeredMetrics() const {
         m.cardH = 456.f;
         m.centerY = 96.f + m.cardH * 0.5f;
     }
-    m.cardW = m.cardH * 2.f / 3.f;
     m.gap = m_centerShown >= 5 ? 24.f : 48.f;
     // Inside a folder the panel starts lower; keep covers inside it.
     if (m_rect.y > 120.f) {
         m.cardH = std::min(m.cardH, m_rect.height - 60.f);
-        m.cardW = m.cardH * 2.f / 3.f;
         m.centerY = m_rect.y + 10.f + m.cardH * 0.5f;
+    }
+    if (m_squareCovers) {
+        // Square cards: as tall as fits, but the whole row must still fit
+        // across (focused + half-size neighbours), centred where the cover was.
+        const float sides = m_centerShown >= 5 ? 4.f : 2.f;     // half-size cards
+        const float widthLimit = (1180.f - sides * m.gap) / (1.f + sides * 0.5f);
+        const float side = std::min(m.cardH, widthLimit);
+        m.cardW = side;
+        m.cardH = side;
+    } else {
+        m.cardW = m.cardH * 2.f / 3.f;
     }
     return m;
 }
@@ -132,7 +151,7 @@ nxui::Rect IconGrid::portraitFocusRestRect() const {
         return {cx - m.cardW * 0.5f, m.centerY - m.cardH * 0.5f, m.cardW, m.cardH};
     }
     constexpr float kCardW = 256.f * 1.09f;
-    constexpr float kCardH = 384.f * 1.09f;
+    const float kCardH = (m_squareCovers ? 256.f : 384.f) * 1.09f;
     const float bottomY = m_rect.y + m_rect.height * 0.856f;
     return {m_rect.x + 96.f, bottomY - kCardH, kCardW, kCardH};
 }
@@ -455,7 +474,7 @@ nxui::Rect IconGrid::dynamicIconRect(int index, float* outScale,
         // cover rests at the left anchor and grows a little; the rest follow
         // at an even gap.
         constexpr float kCardW = 256.f;
-        constexpr float kCardH = 384.f;
+        const float kCardH = m_squareCovers ? 256.f : 384.f;
         constexpr float kGap = 11.f;
         constexpr float kGrow = 1.09f;
         const float stride = kCardW + kGap;

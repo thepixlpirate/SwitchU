@@ -113,6 +113,68 @@ ThemeShopScreen::Tab themeshop::tabs::OptionsTab::build(ThemeShopScreen& screen)
         t.items.push_back(std::move(it));
     }
 
+    // --- Home look: highlight colour and background --------------------------
+    {
+        SettingItem it;
+        it.label = i18n.tr("themeshop.options.highlight", "Game Highlight Color");
+        it.description = i18n.tr("themeshop.options.highlight_desc",
+                                 "Outline around the selected game. Current: ")
+                       + screen.m_homeStyle.highlightHex;
+        it.buttonLabel = i18n.tr("button.change", "Change");
+        it.type = ItemType::Action;
+        it.onChange = [&screen](SettingItem&) {
+            if (screen.m_homeStyleCb) screen.m_homeStyleCb("highlight", 0);
+        };
+        t.items.push_back(std::move(it));
+    }
+    {
+        SettingItem it;
+        it.label = i18n.tr("themeshop.options.background", "Home Background");
+        it.description = i18n.tr("themeshop.options.background_desc",
+                                 "The theme's own background, a solid colour, or a picture from the SD card.");
+        it.type = ItemType::Selector;
+        it.options = {
+            i18n.tr("themeshop.options.bg_theme", "Theme"),
+            i18n.tr("themeshop.options.bg_color", "Solid Color"),
+            i18n.tr("themeshop.options.bg_image", "Picture"),
+        };
+        it.intVal = std::clamp(screen.m_homeStyle.backgroundMode, 0, 2);
+        it.onChange = [&screen](SettingItem& self) {
+            screen.m_homeStyle.backgroundMode = std::clamp(self.intVal, 0, 2);
+            if (screen.m_homeStyleCb) screen.m_homeStyleCb("backgroundMode", self.intVal);
+        };
+        t.items.push_back(std::move(it));
+    }
+    {
+        SettingItem it;
+        it.label = i18n.tr("themeshop.options.bg_color_pick", "Background Color");
+        it.description = i18n.tr("themeshop.options.bg_color_pick_desc",
+                                 "Used when Home Background is Solid Color. Current: ")
+                       + screen.m_homeStyle.backgroundHex;
+        it.buttonLabel = i18n.tr("button.change", "Change");
+        it.type = ItemType::Action;
+        it.onChange = [&screen](SettingItem&) {
+            if (screen.m_homeStyleCb) screen.m_homeStyleCb("backgroundColor", 0);
+        };
+        t.items.push_back(std::move(it));
+    }
+    {
+        SettingItem it;
+        it.label = i18n.tr("themeshop.options.bg_image_pick", "Background Picture");
+        it.description = screen.m_homeStyle.backgroundImage.empty()
+            ? i18n.tr("themeshop.options.bg_image_pick_desc",
+                      "Choose a picture from the SD card (1280x720 looks best). "
+                      "Used when Home Background is Picture.")
+            : i18n.tr("themeshop.options.bg_image_current", "Current: ")
+                + screen.m_homeStyle.backgroundImage;
+        it.buttonLabel = i18n.tr("button.choose", "Choose");
+        it.type = ItemType::Action;
+        it.onChange = [&screen](SettingItem&) {
+            if (screen.m_homeStyleCb) screen.m_homeStyleCb("backgroundImage", 0);
+        };
+        t.items.push_back(std::move(it));
+    }
+
     // --- Automatic day/night theme -----------------------------------------
     // A single entry opens a dedicated window with all the auto-theme settings.
     {

@@ -198,9 +198,10 @@ void WiiUMenuApp::applyHomeChromeOptions() {
     if (m_grid) {
         m_grid->setLineStyle(m_config.homeLineStyle);
         m_grid->setCenteredLayout(m_config.homeCoversShown, m_config.homeClockPosition == 2);
+        m_grid->setSquareCovers(m_config.homeSquareCovers);
     }
     configureDynamicLineNavigation();
-    if (m_grid && !m_grid->isPortraitLine())
+    if (m_grid && (!m_grid->isPortraitLine() || m_config.homeSquareCovers))
         releasePortraitCovers(true);
     syncPortraitTitlePlacement();
     updateCursor();
@@ -216,6 +217,9 @@ void WiiUMenuApp::pushHomeOptionsToSettings() {
     home.showClock = m_config.homeShowClock;
     home.showBattery = m_config.homeShowBattery;
     home.coversShownIndex = m_config.homeCoversShown >= 5 ? 1 : 0;
+    home.coverShape = m_config.homeSquareCovers ? 1 : 0;
+    home.sortMode = m_config.sortMode;
+    home.homeButtonSortMenu = m_config.homeButtonSortMenu;
     home.showDate = m_config.homeShowDate;
     home.dateFormat = m_config.homeDateFormat;
     home.plusAction = m_config.homePlusAction;
@@ -248,6 +252,10 @@ void WiiUMenuApp::applyHomeOption(const std::string& key, int value) {
         applyHomeChromeOptions();
         return;
     }
+    if (key == "sortMode") {
+        applySortMode(value);
+        return;
+    }
     if (key == "openThemes") {
         openThemeShopScreen();
         return;
@@ -261,6 +269,8 @@ void WiiUMenuApp::applyHomeOption(const std::string& key, int value) {
     else if (key == "showClock")             m_config.homeShowClock = on;
     else if (key == "showBattery")           m_config.homeShowBattery = on;
     else if (key == "coversShown")           m_config.homeCoversShown = value >= 1 ? 5 : 3;
+    else if (key == "coverShape")            m_config.homeSquareCovers = value == 1;
+    else if (key == "homeButtonSortMenu")    m_config.homeButtonSortMenu = on;
     else if (key == "showDate")              m_config.homeShowDate = on;
     else if (key == "dateFormat")            m_config.homeDateFormat = std::clamp(value, 0, 1);
     else if (key == "plusAction")            m_config.homePlusAction = std::clamp(value, 0, 1);
@@ -575,7 +585,8 @@ void WiiUMenuApp::pollPortraitCovers() {
 }
 
 void WiiUMenuApp::syncPortraitCovers() {
-    if (!m_grid || !m_grid->isPortraitLine()) {
+    // Square cards use each game's own icon, so no cover art is loaded.
+    if (!m_grid || !m_grid->isPortraitLine() || m_config.homeSquareCovers) {
         if (!m_portraitCovers.empty())
             releasePortraitCovers(true);
         return;
@@ -667,6 +678,7 @@ void WiiUMenuApp::confirmDeleteSoftware(std::uint64_t titleId, const std::string
             {i18n.tr("button.cancel", "Cancel"), []() {}, true},
             {i18n.tr("button.delete", "Delete"), [this, titleId, title]() {
                 startSoftwareDeletion(titleId, title, false);
+                m_softwareDeleteFromHome = true;
             }, true},
         }, 0, {});
     focusManager().setFocus(m_dialog.get());
@@ -743,7 +755,9 @@ void WiiUMenuApp::showCoverBrowser(std::uint64_t titleId, const std::string& tit
         if (slash != std::string::npos && slash > 5) start = choice.substr(0, slash);
     }
     m_navigator.navigate(switchu::navigation::Route::GameOptions);
-    m_coverBrowser->open(title, start, choice);
+    m_coverBrowser->open(nxui::I18n::instance().tr("game.quick.change_icon", "Change Icon")
+                             + (title.empty() ? std::string() : "  -  " + title),
+                         start, choice, true);
     m_audio.playSfx(Sfx::ModalShow);
     focusManager().setFocus(m_coverBrowser.get());
 }
@@ -779,4 +793,274 @@ void WiiUMenuApp::showPowerMenu() {
     m_contextMenu->show(centredMenuAnchor(), i18n.tr("power.title", "Power"), std::move(items));
     m_audio.playSfx(Sfx::ModalShow);
     focusManager().setFocus(m_contextMenu.get());
+}
+
+bool WiiUMenuApp::jumpLine(int direction) {
+    if (!m_grid || m_appLayoutMode != AppLayoutMode::DynamicLine || m_editMode)
+        return false;
+    const auto& icons = m_grid->allIcons();
+    int first = -1, last = -1;
+    for (int i = 0; i < static_cast<int>(icons.size()); ++i) {
+        if (icons[static_cast<std::size_t>(i)] && icons[static_cast<std::size_t>(i)]->isFocusable()) {
+            if (first < 0) first = i;
+            last = i;
+        }
+    }
+    if (first < 0)
+        return true;
+    const int current = std::max(first, m_grid->focusedGlobalIndex());
+    // One screenful: the covers on screen in the centred style, else 5.
+    const int step = m_grid->lineStyle() == 2 ? std::max(3, m_config.homeCoversShown)
+                   : m_grid->lineStyle() == 1 ? 4 : 5;
+    int target = std::clamp(current + direction * step, first, last);
+    while (target != current && !(icons[static_cast<std::size_t>(target)] &&
+                                  icons[static_cast<std::size_t>(target)]->isFocusable()))
+        target -= direction;
+    if (target == current)
+        return true;   // already at the start/end
+    m_grid->focusGlobalIndex(target, false);
+    if (auto* focused = m_grid->focusManager().current())
+        focusManager().setFocus(focused);
+    m_audio.playSfx(Sfx::Navigate);
+    updateCursor();
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// Sorting (HOME button pop-up)
+// ---------------------------------------------------------------------------
+
+void WiiUMenuApp::noteNewTitles() {
+    // First run of this feature: everything already installed shares 0, so
+    // "newest" only moves games installed from now on ahead of the rest.
+    bool changed = false;
+    for (const auto& app : m_allApps) {
+        if (!app.isApplication() || app.titleId == 0) continue;
+        bool known = false;
+        for (const auto& entry : m_config.firstSeen)
+            if (entry.first == app.titleId) { known = true; break; }
+        if (known) continue;
+        m_config.firstSeen.emplace_back(app.titleId, m_config.firstSeenSequence);
+        changed = true;
+    }
+    if (changed) {
+        // Later arrivals get a higher number than everything seen before.
+        ++m_config.firstSeenSequence;
+        if (m_configSaveFuture.valid())
+            m_configSaveFuture.wait();
+        m_configSaveFuture = m_threadPool.submit([config = m_config]() { config.save(); });
+    }
+}
+
+void WiiUMenuApp::applySortMode(int mode) {
+    mode = std::clamp(mode, 0, 5);
+    if (m_config.sortMode == mode)
+        return;
+    m_config.sortMode = mode;
+    if (m_configSaveFuture.valid())
+        m_configSaveFuture.wait();
+    m_configSaveFuture = m_threadPool.submit([config = m_config]() { config.save(); });
+    if (m_navigator.route() == switchu::navigation::Route::Home && m_openFolderId == 0) {
+        reflowHomeGrid();
+        if (m_grid) {
+            // Start from the first game of the new order.
+            const auto& icons = m_grid->allIcons();
+            for (int i = 0; i < static_cast<int>(icons.size()); ++i) {
+                if (icons[static_cast<std::size_t>(i)] &&
+                    icons[static_cast<std::size_t>(i)]->isFocusable()) {
+                    m_grid->focusGlobalIndex(i, false);
+                    break;
+                }
+            }
+            if (auto* focused = m_grid->focusManager().current())
+                focusManager().setFocus(focused);
+        }
+        updateCursor();
+    } else {
+        m_homeRebuildPending = true;
+    }
+    pushHomeOptionsToSettings();
+}
+
+void WiiUMenuApp::showSortMenu() {
+    if (!m_contextMenu) return;
+    auto& i18n = nxui::I18n::instance();
+    if (!m_contextMenu->isActive())
+        m_contextMenuReturnFocus = focusManager().current();
+    const std::pair<int, std::string> modes[] = {
+        {0, i18n.tr("settings.home.sort_custom", "My Order")},
+        {4, i18n.tr("settings.home.sort_newest", "Newest Added")},
+        {5, i18n.tr("settings.home.sort_oldest", "Oldest Added")},
+        {2, i18n.tr("settings.home.sort_recent", "Recently Played")},
+        {1, i18n.tr("settings.home.sort_az", "Title A-Z")},
+        {3, i18n.tr("settings.home.sort_za", "Title Z-A")},
+    };
+    std::vector<ContextMenu::Item> items;
+    int selected = 0;
+    for (const auto& [mode, label] : modes) {
+        if (mode == m_config.sortMode) selected = static_cast<int>(items.size());
+        const std::string shown = mode == m_config.sortMode ? label + "  (current)" : label;
+        items.push_back({shown, [this, m = mode]() {
+            m_contextMenu->hide();
+            applySortMode(m);
+        }});
+    }
+    m_contextMenu->show(centredMenuAnchor(), i18n.tr("settings.home.sort", "Sort Games"),
+                        std::move(items), selected);
+    m_audio.playSfx(Sfx::ModalShow);
+    focusManager().setFocus(m_contextMenu.get());
+}
+
+void WiiUMenuApp::processPendingHomeRebuild() {
+    if (!m_homeRebuildPending || !m_grid || m_openFolderId != 0)
+        return;
+    if (m_navigator.route() != switchu::navigation::Route::Home ||
+        (m_contextMenu && m_contextMenu->isActive()) ||
+        (m_dialog && m_dialog->isActive()) ||
+        (m_progressDialog && m_progressDialog->isActive()) ||
+        (m_coverBrowser && m_coverBrowser->isActive()) ||
+        (m_settings && m_settings->isActive()))
+        return;
+    m_homeRebuildPending = false;
+    std::uint64_t focusId = 0;
+    if (auto* cur = m_grid->focusManager().current(); cur && cur->tag() == "glossy_icon")
+        focusId = static_cast<GlossyIcon*>(cur)->titleId();
+    applyDisplayModel(buildRootFolderModel(), focusId, false, {}, true);
+    if (auto* focused = m_grid->focusManager().current())
+        focusManager().setFocus(focused);
+    updateCursor();
+}
+
+// ---------------------------------------------------------------------------
+// Themes > Options: highlight colour and HOME background
+// ---------------------------------------------------------------------------
+
+nxui::Color WiiUMenuApp::highlightColor() const {
+    nxui::Color color(0.48f, 0.12f, 0.66f, 1.f);
+    ColorPicker::parseHex(m_config.homeHighlightHex, color);
+    return color;
+}
+
+void WiiUMenuApp::pushHomeStyleToThemeShop() {
+    if (!m_themeShop) return;
+    m_themeShop->setHomeStyleState({m_config.homeHighlightHex, m_config.homeBackgroundMode,
+                                    m_config.homeBackgroundHex,
+                                    std::filesystem::path(m_config.homeBackgroundImage)
+                                        .filename().string()});
+    if (m_themeShop->isActive())
+        m_themeShop->rebuildCurrentTab();
+}
+
+void WiiUMenuApp::openColorPicker(const std::string& target) {
+    if (!m_colorPicker) return;
+    auto& i18n = nxui::I18n::instance();
+    m_colorPickerTarget = target;
+    if (m_overlayLayer) {   // above the Themes window
+        m_overlayLayer->removeChild(m_colorPicker.get());
+        m_overlayLayer->addChild(m_colorPicker);
+    }
+    if (target == "background")
+        m_colorPicker->open(i18n.tr("themeshop.options.bg_color_pick", "Background Color"),
+                            m_config.homeBackgroundHex, ColorPicker::Preview::Fill);
+    else
+        m_colorPicker->open(i18n.tr("themeshop.options.highlight", "Game Highlight Color"),
+                            m_config.homeHighlightHex, ColorPicker::Preview::Outline);
+    m_audio.playSfx(Sfx::ModalShow);
+    focusManager().setFocus(m_colorPicker.get());
+}
+
+void WiiUMenuApp::handleHomeStyleAction(const std::string& action, int value) {
+    if (action == "highlight") {
+        openColorPicker("highlight");
+    } else if (action == "backgroundColor") {
+        openColorPicker("background");
+    } else if (action == "backgroundImage") {
+        if (!m_coverBrowser) return;
+        std::error_code ec;
+        std::string start = "sdmc:/config/SwitchU/backgrounds";
+        std::filesystem::create_directories(start, ec);
+        if (!m_config.homeBackgroundImage.empty()) {
+            const auto slash = m_config.homeBackgroundImage.find_last_of('/');
+            if (slash != std::string::npos && slash > 5)
+                start = m_config.homeBackgroundImage.substr(0, slash);
+        }
+        m_browserForBackground = true;
+        if (m_overlayLayer) {
+            m_overlayLayer->removeChild(m_coverBrowser.get());
+            m_overlayLayer->addChild(m_coverBrowser);
+        }
+        m_coverBrowser->open(nxui::I18n::instance().tr("themeshop.options.bg_image_pick",
+                                                       "Background Picture"),
+                             start, m_config.homeBackgroundImage, false);
+        m_audio.playSfx(Sfx::ModalShow);
+        focusManager().setFocus(m_coverBrowser.get());
+    } else if (action == "backgroundMode") {
+        m_config.homeBackgroundMode = std::clamp(value, 0, 2);
+        if (m_configSaveFuture.valid())
+            m_configSaveFuture.wait();
+        m_configSaveFuture = m_threadPool.submit([config = m_config]() { config.save(); });
+        applyHomeBackground();
+    }
+}
+
+void WiiUMenuApp::applyHomeBackground() {
+    if (!m_homeBackdrop) return;
+    switch (m_config.homeBackgroundMode) {
+        case 1: {
+            nxui::Color color(0.f, 0.f, 0.f, 1.f);
+            ColorPicker::parseHex(m_config.homeBackgroundHex, color);
+            m_homeBackdrop->setColor(color);
+            m_homeBackdrop->setMode(HomeBackdrop::Mode::Solid);
+            break;
+        }
+        case 2: {
+            const std::string path = m_config.homeBackgroundImage;
+            if (path.empty() || !fileExists(path)) {
+                m_homeBackdrop->setMode(HomeBackdrop::Mode::Theme);   // nothing chosen yet
+                break;
+            }
+            m_homeBackdrop->setMode(HomeBackdrop::Mode::Image);
+            if (path != m_homeBackgroundLoadedPath && !m_homeBackgroundFuture.valid()) {
+                auto job = std::make_shared<BackgroundDecode>();
+                job->path = path;
+                m_homeBackgroundDecode = job;
+                m_homeBackgroundFuture = m_threadPool.submit([job]() {
+                    job->image = steamgriddb::artwork::decode(job->path, 1280, 720, true);
+                });
+            }
+            m_homeBackdrop->setTexture(path == m_homeBackgroundLoadedPath
+                                           ? m_homeBackgroundTexture.get() : nullptr);
+            break;
+        }
+        default:
+            m_homeBackdrop->setMode(HomeBackdrop::Mode::Theme);
+            break;
+    }
+}
+
+void WiiUMenuApp::pollHomeBackground() {
+    if (!m_homeBackgroundFuture.valid() ||
+        m_homeBackgroundFuture.wait_for(std::chrono::seconds(0)) != std::future_status::ready)
+        return;
+    try { m_homeBackgroundFuture.get(); } catch (...) {}
+    auto job = std::move(m_homeBackgroundDecode);
+    if (!job) return;
+    // Retire the old picture before uploading the new one.
+    if (m_homeBackgroundTexture) {
+        if (m_homeBackdrop) m_homeBackdrop->setTexture(nullptr);
+        app().gpu().waitIdle();
+        m_homeBackgroundTexture.reset();
+#ifdef NXUI_BACKEND_DEKO3D
+        app().renderer().reclaimReleasedTextureSlotsAfterIdle();
+#endif
+    }
+    m_homeBackgroundLoadedPath = job->path;
+    if (!job->image.rgba.empty()) {
+        auto texture = std::make_unique<nxui::Texture>();
+        if (texture->loadFromPixels(app().gpu(), app().renderer(), job->image.rgba.data(),
+                                    job->image.width, job->image.height))
+            m_homeBackgroundTexture = std::move(texture);
+    }
+    // The choice may have changed again while this was decoding.
+    applyHomeBackground();
 }

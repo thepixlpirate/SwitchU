@@ -1133,6 +1133,8 @@ bool WiiUMenuApp::isCurrentFocusableWidget(nxui::Widget* w) const {
     if (m_steamGridDbPicker && m_steamGridDbPicker.get() == w) return w->isFocusable();
     if (m_textEntry && m_textEntry.get() == w) return w->isFocusable();
     if (m_quickSettings && m_quickSettings.get() == w) return w->isFocusable();
+    if (m_colorPicker && m_colorPicker.get() == w) return m_colorPicker->isActive();
+    if (m_coverBrowser && m_coverBrowser.get() == w) return m_coverBrowser->isActive();
     if (m_themeShop && m_themeShop.get() == w) return w->isFocusable();
     if (m_settings && m_settings.get() == w) return w->isFocusable();
     for (const auto& btn : m_sidebar.leftButtons())
@@ -1208,6 +1210,8 @@ void WiiUMenuApp::closeActiveOverlays(bool closeFolders) {
         m_userSelect->hide();
     if (m_contextMenu && m_contextMenu->isActive())
         m_contextMenu->hide();
+    if (m_coverBrowser && m_coverBrowser->isActive())
+        m_coverBrowser->close();
     if (m_dialog && m_dialog->isActive())
         m_dialog->hide();
     if (m_quickSettings && m_quickSettings->isActive())
@@ -1352,10 +1356,14 @@ void WiiUMenuApp::wireGlobalActions() {
     root.addAction(static_cast<uint64_t>(nxui::Button::ZL), [this]() {
         if (m_navigator.route() != switchu::navigation::Route::Home || focusRoot() != &rootBox())
             return;
+        if (jumpLine(-1))
+            return;
         flipPage(-1);
     });
     root.addAction(static_cast<uint64_t>(nxui::Button::ZR), [this]() {
         if (m_navigator.route() != switchu::navigation::Route::Home || focusRoot() != &rootBox())
+            return;
+        if (jumpLine(+1))
             return;
         flipPage(+1);
     });
@@ -1947,6 +1955,25 @@ void WiiUMenuApp::handleSystemAction(SysAction a) {
             // Physical HOME while already browsing the menu.
             DebugLog::log("[pump] HomeDismiss -> close folder/overlays");
             m_launcher.setAppHasForeground(false);
+            // On the plain HOME screen (nothing open), HOME opens the sort
+            // pop-up instead (Settings > Home Screen). Pressing HOME again
+            // with the pop-up open closes it like any other overlay.
+            {
+                const bool overlayOpen =
+                    m_navigator.route() != switchu::navigation::Route::Home ||
+                    (m_contextMenu && m_contextMenu->isActive()) ||
+                    (m_coverBrowser && m_coverBrowser->isActive()) ||
+                    (m_dialog && m_dialog->isActive()) ||
+                    (m_quickSettings && m_quickSettings->isActive()) ||
+                    (m_textEntry && m_textEntry->isActive()) ||
+                    (m_userSelect && m_userSelect->isActive()) ||
+                    (m_progressDialog && m_progressDialog->isActive());
+                if (m_config.homeButtonSortMenu && !overlayOpen &&
+                    m_openFolderId == 0 && !m_editMode) {
+                    showSortMenu();
+                    break;
+                }
+            }
             const std::uint32_t folderBefore = m_openFolderId;
             closeActiveOverlays(true);
             if (folderBefore != 0) {
@@ -2032,7 +2059,7 @@ void WiiUMenuApp::updateCursor() {
         m_cursor->setPlainStyle(portrait);
         if (portrait) {
             // Switch look: a solid purple frame hugging the cover.
-            m_cursor->setColor(nxui::Color(0.48f, 0.12f, 0.66f, 1.f));
+            m_cursor->setColor(highlightColor());
             m_cursor->setBorderWidth(6.f);
             m_cursor->moveTo(fr.expanded(movingLineFocus ? 6.f : 4.f),
                              movingLineFocus ? 23.f : 18.f,

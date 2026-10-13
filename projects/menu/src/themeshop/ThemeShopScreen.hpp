@@ -47,6 +47,17 @@ public:
     void onGridRowsChange(IntCb cb)      { m_gridRowsCb = std::move(cb); }
     void onActionHintStyleChange(IntCb cb) { m_actionHintStyleCb = std::move(cb); }
     void onAutoThemeOpen(VoidCb cb) { m_autoThemeOpenCb = std::move(cb); }
+    // Home look (highlight colour, background). `action` names the row.
+    void onHomeStyleAction(std::function<void(const std::string& action, int value)> cb) {
+        m_homeStyleCb = std::move(cb);
+    }
+    struct HomeStyleState {
+        std::string highlightHex = "#7A1FA8";
+        int backgroundMode = 0;              // 0 = theme, 1 = solid colour, 2 = picture
+        std::string backgroundHex = "#000000";
+        std::string backgroundImage;         // file name shown in the row
+    };
+    void setHomeStyleState(const HomeStyleState& state) { m_homeStyle = state; }
     void onCursorMotionModeChange(IntCb cb) { m_cursorMotionModeCb = std::move(cb); }
     void onPageTransitionModeChange(IntCb cb) { m_pageTransitionModeCb = std::move(cb); }
     void onNextTrack(VoidCb cb)          { m_nextTrackCb = std::move(cb); }
@@ -215,6 +226,8 @@ private:
     IntCb m_gridRowsCb;
     IntCb m_actionHintStyleCb;
     VoidCb m_autoThemeOpenCb;
+    std::function<void(const std::string&, int)> m_homeStyleCb;
+    HomeStyleState m_homeStyle;
     IntCb m_cursorMotionModeCb;
     IntCb m_pageTransitionModeCb;
     VoidCb m_nextTrackCb;

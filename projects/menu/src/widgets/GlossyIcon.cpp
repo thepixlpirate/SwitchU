@@ -619,8 +619,10 @@ void GlossyIcon::renderPortrait(nxui::Renderer& ren) {
         if (m_tex && m_tex->valid()) {
             const float side = r.width;
             const nxui::Rect iconRect{r.x, r.y + (r.height - side) * 0.5f, side, side};
+            // A square card is the icon itself, so it gets the card's corners.
+            const float iconRadius = std::abs(r.height - r.width) < 2.f ? rad : 0.f;
             ren.drawTextureSubRounded(m_tex, centeredCoverSource(*m_tex, iconRect), iconRect,
-                                      0.f, nxui::Color::white().withAlpha(a));
+                                      iconRadius, nxui::Color::white().withAlpha(a));
         } else {
             ren.drawRoundedRect(r.shrunk(r.width * 0.2f),
                                 m_loadingColor.withAlpha(0.18f * a), rad);

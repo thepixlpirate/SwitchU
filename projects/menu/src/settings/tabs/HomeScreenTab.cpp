@@ -87,6 +87,13 @@ SettingsScreen::Tab settings::tabs::HomeScreenTab::build(SettingsScreen& screen)
                 i18n.tr("settings.home.covers_shown_desc",
                         "For the Centered style: the selected game plus 1 or 2 on each side."),
                 {"3", "5"}, "coversShown", &S::coversShownIndex);
+    addSelector(i18n.tr("settings.home.cover_shape", "Cover Shape"),
+                i18n.tr("settings.home.cover_shape_desc",
+                        "Portrait: tall 2:3 covers from /iconswap and SteamGridDB. "
+                        "Square: the games' normal square icons."),
+                {i18n.tr("settings.home.shape_portrait", "Portrait"),
+                 i18n.tr("settings.home.shape_square", "Square")},
+                "coverShape", &S::coverShape);
     {
         SettingItem it;
         it.label = i18n.tr("settings.display.grid_rows", "Home Grid Rows");
@@ -146,6 +153,22 @@ SettingsScreen::Tab settings::tabs::HomeScreenTab::build(SettingsScreen& screen)
                 {i18n.tr("settings.home.minus_power", "Power Menu"),
                  i18n.tr("settings.home.minus_view", "Switch View")},
                 "minusAction", &S::minusAction);
+
+    addSelector(i18n.tr("settings.home.sort", "Sort Games"),
+                i18n.tr("settings.home.sort_desc",
+                        "Order of the games. Newest/Oldest Added count from when this version "
+                        "of SwitchU first saw each game."),
+                {i18n.tr("settings.home.sort_custom", "My Order"),
+                 i18n.tr("settings.home.sort_az", "Title A-Z"),
+                 i18n.tr("settings.home.sort_recent", "Recently Played"),
+                 i18n.tr("settings.home.sort_za", "Title Z-A"),
+                 i18n.tr("settings.home.sort_newest", "Newest Added"),
+                 i18n.tr("settings.home.sort_oldest", "Oldest Added")},
+                "sortMode", &S::sortMode);
+    addToggle(i18n.tr("settings.home.home_sort", "HOME Button Opens Sort Menu"),
+              i18n.tr("settings.home.home_sort_desc",
+                      "Press HOME on the Home screen to change how games are sorted."),
+              "homeButtonSortMenu", &S::homeButtonSortMenu);
 
     // --- Clock ------------------------------------------------------------
     addSection(i18n.tr("settings.home.section_clock", "Clock"));

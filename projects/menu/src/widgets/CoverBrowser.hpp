@@ -40,8 +40,10 @@ public:
     void onActivate(VoidCallback cb) { m_onActivate = std::move(cb); }
 
     // `currentChoice` is highlighted when it is in the opened folder.
-    void open(const std::string& gameTitle, const std::string& startDirectory,
-              const std::string& currentChoice);
+    // `heading` is the window title. `coverChoices` adds the Automatic and
+    // Original Icon tiles (off when picking a background picture).
+    void open(const std::string& heading, const std::string& startDirectory,
+              const std::string& currentChoice, bool coverChoices = true);
     void close();
     bool isActive() const { return m_active; }
 
@@ -86,6 +88,7 @@ private:
 
     bool m_active = false;
     std::string m_gameTitle;
+    bool m_coverChoices = true;
     std::string m_directory;
     std::string m_currentChoice;
     std::vector<Entry> m_entries;

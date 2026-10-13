@@ -41,6 +41,9 @@ public:
     // Centred style: how many covers are on screen (3 or 5) and whether the
     // clock/battery bar sits at the bottom (frees the top for bigger covers).
     void setCenteredLayout(int coversShown, bool barAtBottom);
+    // Square (1:1) cards instead of tall 2:3 covers in the portrait styles.
+    void setSquareCovers(bool square);
+    bool squareCovers() const { return m_squareCovers; }
     int  lineStyle() const { return m_lineStyle; }
     bool isPortraitLine() const {
         return m_layoutMode == AppLayoutMode::DynamicLine && m_lineStyle >= 1;
@@ -146,6 +149,7 @@ private:
     int m_lineStyle = 0;
     int m_centerShown = 5;
     bool m_centerBarBottom = true;
+    bool m_squareCovers = false;
     struct CenteredMetrics { float cardW, cardH, centerY, gap; };
     CenteredMetrics centeredMetrics() const;
     float centeredOffsetX(float d) const;

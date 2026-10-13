@@ -45,7 +45,20 @@ struct AppConfig {
 
     // 0 keeps the hand-made layout. The other modes are display-only
     // projections and never overwrite layout.json.
+    // 0 = my order, 1 = A-Z, 2 = recently played, 3 = Z-A,
+    // 4 = newest added, 5 = oldest added.
     int sortMode = 0;
+    // When each game was first seen by SwitchU (a running number), for the
+    // "newest added" sort. Games present on the first run share 0.
+    std::vector<std::pair<std::uint64_t, std::uint64_t>> firstSeen;
+    std::uint64_t firstSeenSequence = 0;
+    std::uint64_t firstSeenAt(std::uint64_t titleId) const {
+        for (const auto& entry : firstSeen)
+            if (entry.first == titleId) return entry.second;
+        return 0;
+    }
+    // HOME button while already on the menu opens the sort pop-up.
+    bool homeButtonSortMenu = true;
     std::vector<std::pair<std::uint64_t, std::uint64_t>> lastOpened;
     std::uint64_t lastOpenedSequence = 0;
 
@@ -95,6 +108,15 @@ struct AppConfig {
     bool  homeShowBattery = true;
     // Centred single row: covers on screen, 3 or 5.
     int   homeCoversShown = 5;
+    // Card shape in the portrait styles: false = tall 2:3 covers,
+    // true = square 1:1 game icons.
+    bool  homeSquareCovers = false;
+    // Outline around the selected game (Themes > Options).
+    std::string homeHighlightHex = "#7A1FA8";
+    // HOME background: 0 = the theme's own, 1 = solid colour, 2 = picture.
+    int   homeBackgroundMode = 0;
+    std::string homeBackgroundHex = "#000000";
+    std::string homeBackgroundImage;
     // + on a game: 0 = small popup (change icon / hide / delete),
     //              1 = the full game options screen (original).
     int   homePlusAction = 0;

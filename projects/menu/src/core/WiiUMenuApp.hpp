@@ -19,6 +19,8 @@
 #include "widgets/QuickSettingsOverlay.hpp"
 #include "widgets/ContextMenu.hpp"
 #include "widgets/CoverBrowser.hpp"
+#include "widgets/ColorPicker.hpp"
+#include "widgets/HomeBackdrop.hpp"
 #include "widgets/ProgressDialog.hpp"
 #include "widgets/AppletButton.hpp"
 #include "widgets/PageIndicator.hpp"
@@ -384,6 +386,23 @@ private:
     void showCoverBrowser(std::uint64_t titleId, const std::string& title,
                           const std::string& directory);
     void showPowerMenu();
+    // ZL/ZR in the single row: jump a whole screen of games. False when not
+    // in the single row (the grid then flips pages as before).
+    bool jumpLine(int direction);
+    // HOME pressed while already on the menu: sort pop-up.
+    void showSortMenu();
+    void applySortMode(int mode);
+    // Gives newly installed games a "first seen" number for the Newest sort.
+    void noteNewTitles();
+    // Rebuild deferred while an overlay owned focus (e.g. a game deleted).
+    void processPendingHomeRebuild();
+    // Themes > Options: highlight colour and HOME background.
+    void handleHomeStyleAction(const std::string& action, int value);
+    void openColorPicker(const std::string& target);
+    void pushHomeStyleToThemeShop();
+    void applyHomeBackground();
+    void pollHomeBackground();
+    nxui::Color highlightColor() const;
     void confirmDeleteSoftware(std::uint64_t titleId, const std::string& title);
     void syncPortraitCovers();
     void pollPortraitCovers();
@@ -444,6 +463,19 @@ private:
     std::shared_ptr<ContextMenu>       m_contextMenu;
     std::shared_ptr<CoverBrowser>      m_coverBrowser;
     std::uint64_t                      m_coverBrowserTitleId = 0;
+    bool                               m_softwareDeleteFromHome = false;
+    bool                               m_browserForBackground = false;
+    std::shared_ptr<ColorPicker>       m_colorPicker;
+    std::string                        m_colorPickerTarget;   // "highlight" | "background"
+    std::shared_ptr<HomeBackdrop>      m_homeBackdrop;
+    std::unique_ptr<nxui::Texture>     m_homeBackgroundTexture;
+    std::string                        m_homeBackgroundLoadedPath;
+    struct BackgroundDecode {
+        std::string path;
+        steamgriddb::artwork::DecodedImage image;
+    };
+    std::shared_ptr<BackgroundDecode>  m_homeBackgroundDecode;
+    std::future<void>                  m_homeBackgroundFuture;
     std::shared_ptr<ProgressDialog>    m_progressDialog;
     std::shared_ptr<SettingsScreen>    m_settings;
     std::shared_ptr<ThemeShopScreen>   m_themeShop;
