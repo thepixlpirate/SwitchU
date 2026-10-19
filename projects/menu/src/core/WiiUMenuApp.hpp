@@ -397,6 +397,8 @@ private:
     // Holding ZL/ZR keeps jumping until released.
     void updateTriggerRepeat(float dt);
     float m_triggerHoldTime = 0.f;
+    bool  m_minusPressPending = false;   // tap = - action, hold = Settings
+    float m_minusHoldTime = 0.f;
     float m_triggerRepeatTimer = 0.f;
     // HOME pressed while already on the menu: sort pop-up.
     void showSortMenu();

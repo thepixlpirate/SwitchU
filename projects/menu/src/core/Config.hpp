@@ -93,7 +93,7 @@ struct AppConfig {
     bool  homeShowThemesButton = false;       // Theme shop shortcut
     // Settings shortcut. Only hidden while - opens the power menu, so
     // Settings can always be reached.
-    bool  homeShowSettingsButton = true;
+    bool  homeShowSettingsButton = false;   // hold - to open Settings
     bool  homeShowButtonHints = false;        // bottom-right hints on the home screen
     bool  homeShowDate = false;               // date line under the clock
     // 0 = month/day/year (US), 1 = day/month/year.
@@ -137,8 +137,8 @@ struct AppConfig {
     int   homeLineStyle = 2;
     // Bumped when new minimal defaults should be applied once to an existing
     // settings file. load() reads 0 for files written by older builds.
-    int   homeDefaultsVersion = 4;
-    static constexpr int kHomeDefaultsVersion = 4;
+    int   homeDefaultsVersion = 5;
+    static constexpr int kHomeDefaultsVersion = 5;
 
     // Games hidden from HOME (Settings > Home Screen lists them to unhide).
     std::vector<std::uint64_t> hiddenTitles;

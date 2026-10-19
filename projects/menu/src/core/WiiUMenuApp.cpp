@@ -5818,12 +5818,33 @@ void WiiUMenuApp::onUpdateAwake(float dt) {
         !(m_userSelect && m_userSelect->isActive())) {
         const bool debugCombo = app().input().isHeld(nxui::Button::L) &&
                                 app().input().isHeld(nxui::Button::R);
-        if (debugCombo)
-            ;   // L + R + Minus is the debug log toggle, not the power menu
-        else if (m_config.homeMinusAction == 0)
-            showPowerMenu();
-        else
-            toggleAppLayoutMode();
+        // L + R + Minus is the debug log toggle. Otherwise wait to see
+        // whether this is a tap (the - action) or a hold (Settings).
+        if (!debugCombo) {
+            m_minusPressPending = true;
+            m_minusHoldTime = 0.f;
+        }
+    }
+    if (m_minusPressPending) {
+        auto& input = app().input();
+        constexpr float kHoldToOpenSettings = 0.6f;
+        if (input.isHeld(nxui::Button::Plus) || m_editMode ||
+            m_navigator.route() != switchu::navigation::Route::Home) {
+            m_minusPressPending = false;   // a combo, or something else took over
+        } else if (input.isHeld(nxui::Button::Minus)) {
+            m_minusHoldTime += dt;
+            if (m_minusHoldTime >= kHoldToOpenSettings) {
+                m_minusPressPending = false;
+                if (m_openSettingsAction) m_openSettingsAction();
+            }
+        } else {
+            // Released before the hold time: a normal tap.
+            m_minusPressPending = false;
+            if (m_config.homeMinusAction == 0)
+                showPowerMenu();
+            else
+                toggleAppLayoutMode();
+        }
     }
 
     if (m_plusExitPending) {

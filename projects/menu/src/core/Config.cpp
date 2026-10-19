@@ -216,6 +216,10 @@ bool AppConfig::load() {
             homeButtonSortMenu = false;
             homeLongPressPowerMenu = true;
         }
+        if (from < 5) {
+            // Holding - now opens Settings, so the icon is no longer needed.
+            homeShowSettingsButton = false;
+        }
         homeDefaultsVersion = kHomeDefaultsVersion;
     }
     if (themePreset.empty()) themePreset = "Default Light";

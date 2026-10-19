@@ -76,7 +76,7 @@ public:
         bool showControllersButton = false;
         bool showSleepButton = false;
         bool showThemesButton = false;
-        bool showSettingsButton = true;
+        bool showSettingsButton = false;
         bool showButtonHints = false;
         // Hidden games: title ID and name, for the unhide list.
         std::vector<std::pair<std::uint64_t, std::string>> hiddenGames;

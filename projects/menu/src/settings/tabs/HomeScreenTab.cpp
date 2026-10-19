@@ -148,8 +148,8 @@ SettingsScreen::Tab settings::tabs::HomeScreenTab::build(SettingsScreen& screen)
                 "plusAction", &S::plusAction);
     addSelector(i18n.tr("settings.home.minus_action", "- Button"),
                 i18n.tr("settings.home.minus_action_desc",
-                        "Power Menu: Power Off, Restart or Settings. "
-                        "Switch View: change between single row and grid (original)."),
+                        "Tap -: Switch View changes between single row and grid (original); Power Menu shows "
+                        "Restart / Sleep / Power Off / Settings. Hold - for Settings either way."),
                 {i18n.tr("settings.home.minus_power", "Power Menu"),
                  i18n.tr("settings.home.minus_view", "Switch View")},
                 "minusAction", &S::minusAction);
@@ -231,8 +231,7 @@ SettingsScreen::Tab settings::tabs::HomeScreenTab::build(SettingsScreen& screen)
               "showHudBubbles", &S::showHudBubbles);
     addToggle(i18n.tr("settings.home.settings_button", "Settings Button"),
               i18n.tr("settings.home.settings_button_desc",
-                      "The Settings icon on the Home screen. When hidden, open Settings with the - button "
-                      "(only while - is set to Power Menu)."),
+                      "The Settings icon on the Home screen. Holding the - button always opens Settings."),
               "showSettingsButton", &S::showSettingsButton);
     addToggle(i18n.tr("settings.home.homebrew_button", "Homebrew Button"),
               i18n.tr("settings.home.homebrew_button_desc", "Shortcut to the Album / homebrew menu."),

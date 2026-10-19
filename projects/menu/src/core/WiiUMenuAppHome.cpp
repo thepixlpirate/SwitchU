@@ -179,8 +179,8 @@ void WiiUMenuApp::applyHomeChromeOptions() {
     SidebarManager::Visibility visibility;
     visibility.homebrew = m_config.homeShowHomebrewButton;
     visibility.miiEditor = m_config.homeShowMiiButton;
-    // Settings may only disappear while - opens the power menu with Settings.
-    visibility.settings = m_config.homeShowSettingsButton || m_config.homeMinusAction != 0;
+    // Holding - always opens Settings, so the icon can be hidden.
+    visibility.settings = m_config.homeShowSettingsButton;
     visibility.controllers = m_config.homeShowControllersButton;
     visibility.sleep = m_config.homeShowSleepButton;
     visibility.themes = m_config.homeShowThemesButton;
