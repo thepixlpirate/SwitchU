@@ -1305,6 +1305,9 @@ void WiiUMenuApp::toggleAccessibilitySpeech() {
 }
 
 bool WiiUMenuApp::handleAccessibilityToggleCombo() {
+    // The + and - shortcut is turned off so the screen reader can never be
+    // switched on by accident. It is only turned on in Settings > Accessibility.
+    return false;
     if (m_navigator.route() == switchu::navigation::Route::ControllerTest)
         return false;
     auto& input = app().input();
@@ -1399,16 +1402,9 @@ void WiiUMenuApp::wireGlobalActions() {
     root.addAction(static_cast<uint64_t>(nxui::Button::Minus), [this]() {
         if (m_navigator.route() == switchu::navigation::Route::ControllerTest)
             return;
-        if (handleAccessibilityToggleCombo())
-            return;
-        // Minus on its own is the power pop-up (Settings > Home Screen), so
-        // the debug log needs L + R held as well.
-        if (!app().input().isDown(nxui::Button::L) && !app().input().isHeld(nxui::Button::L))
-            return;
-        if (!app().input().isDown(nxui::Button::R) && !app().input().isHeld(nxui::Button::R))
-            return;
-        m_showDebugOverlay = !m_showDebugOverlay;
-        DebugLog::log("[debug] ImGui overlay toggled: %d", m_showDebugOverlay ? 1 : 0);
+        // The debug log window has no button shortcut any more; it is only
+        // opened from Settings > Home Screen > Developer.
+        (void)this;
     });
 #else
     root.addAction(static_cast<uint64_t>(nxui::Button::Minus), [this]() {

@@ -223,6 +223,7 @@ void WiiUMenuApp::pushHomeOptionsToSettings() {
     home.homeButtonSortMenu = m_config.homeButtonSortMenu;
     home.showArchived = m_config.homeShowArchived;
     home.longPressPowerMenu = m_config.homeLongPressPowerMenu;
+    home.debugWindow = m_showDebugOverlay;
     home.videoBackgrounds = m_config.homeVideoBackgrounds;
     home.videoDim = m_config.homeVideoDim;
     home.showDate = m_config.homeShowDate;
@@ -259,6 +260,11 @@ void WiiUMenuApp::applyHomeOption(const std::string& key, int value) {
     }
     if (key == "sortMode") {
         applySortMode(value);
+        return;
+    }
+    if (key == "debugWindow") {
+        // Not saved: a restart always comes back with it off.
+        m_showDebugOverlay = on;
         return;
     }
     if (key == "openThemes") {

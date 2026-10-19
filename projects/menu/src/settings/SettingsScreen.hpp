@@ -63,6 +63,7 @@ public:
         bool homeButtonSortMenu = false;
         bool showArchived = false;
         bool longPressPowerMenu = true;
+        bool debugWindow = false;
         bool videoBackgrounds = true;
         int  videoDim = 1;
         bool showDate = false;

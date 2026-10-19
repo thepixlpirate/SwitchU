@@ -317,6 +317,13 @@ SettingsScreen::Tab settings::tabs::HomeScreenTab::build(SettingsScreen& screen)
         }
     }
 
+    // --- Developer ------------------------------------------------------------
+    addSection(i18n.tr("settings.home.section_dev", "Developer"));
+    addToggle(i18n.tr("settings.home.debug_window", "Debug Log Window"),
+              i18n.tr("settings.home.debug_window_desc",
+                      "Shows the developer log over the Home screen. Turns itself off after a restart."),
+              "debugWindow", &S::debugWindow);
+
     // --- Covers ---------------------------------------------------------------
     addSection(i18n.tr("settings.home.section_covers", "Portrait Covers"));
     {

@@ -5816,19 +5816,14 @@ void WiiUMenuApp::onUpdateAwake(float dt) {
         !(m_controllerTest && m_controllerTest->isActive()) &&
         !(m_profileCarousel && m_profileCarousel->isActive()) &&
         !(m_userSelect && m_userSelect->isActive())) {
-        const bool debugCombo = app().input().isHeld(nxui::Button::L) &&
-                                app().input().isHeld(nxui::Button::R);
-        // L + R + Minus is the debug log toggle. Otherwise wait to see
-        // whether this is a tap (the - action) or a hold (Settings).
-        if (!debugCombo) {
-            m_minusPressPending = true;
-            m_minusHoldTime = 0.f;
-        }
+        // Wait to see whether this is a tap (the - action) or a hold (Settings).
+        m_minusPressPending = true;
+        m_minusHoldTime = 0.f;
     }
     if (m_minusPressPending) {
         auto& input = app().input();
         constexpr float kHoldToOpenSettings = 0.6f;
-        if (input.isHeld(nxui::Button::Plus) || m_editMode ||
+        if (m_editMode ||
             m_navigator.route() != switchu::navigation::Route::Home) {
             m_minusPressPending = false;   // a combo, or something else took over
         } else if (input.isHeld(nxui::Button::Minus)) {
