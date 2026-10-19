@@ -1103,6 +1103,16 @@ static void handleAppletMessages() {
         openMenuFromHome("ae");
         break;
 
+        case 21:
+        // HOME held down. On the menu it opens the power pop-up; anywhere
+        // else it behaves like a normal HOME press.
+        switchu::FileLog::log("[ae] -> HOME long press");
+        if (daemon::menu_la::isActive())
+            pushNotification(smi::MenuMessage::HomeLongPress);
+        else
+            openMenuFromHome("ae-long");
+        break;
+
         case 22:
         case 29:
         case 32:

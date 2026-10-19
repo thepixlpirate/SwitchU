@@ -21,6 +21,7 @@ enum class MenuMessage : uint32_t {
     AppViewFlagsUpdate    =  9,
     BatteryStatusChanged  = 10,
     OperationFailed       = 11,
+    HomeLongPress         = 12,   // HOME held while the menu is open
 };
 
 enum class SystemMessage : uint32_t {

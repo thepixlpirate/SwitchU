@@ -5651,6 +5651,13 @@ void WiiUMenuApp::onUpdateAwake(float dt) {
                 }
                 break;
             }
+            case switchu::smi::MenuMessage::HomeLongPress:
+                if (m_config.homeLongPressPowerMenu && !m_editMode &&
+                    !(m_launchAnim && m_launchAnim->isPlaying())) {
+                    closeActiveOverlays(false);
+                    showPowerMenu(false);
+                }
+                break;
             case switchu::smi::MenuMessage::BatteryStatusChanged:
                 if (m_battery) {
                     const uint32_t percent = switchu::smi::batteryPayloadPercentage(notif.payload);

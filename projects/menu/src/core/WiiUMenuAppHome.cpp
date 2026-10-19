@@ -222,6 +222,7 @@ void WiiUMenuApp::pushHomeOptionsToSettings() {
     home.sortMode = m_config.sortMode;
     home.homeButtonSortMenu = m_config.homeButtonSortMenu;
     home.showArchived = m_config.homeShowArchived;
+    home.longPressPowerMenu = m_config.homeLongPressPowerMenu;
     home.videoBackgrounds = m_config.homeVideoBackgrounds;
     home.videoDim = m_config.homeVideoDim;
     home.showDate = m_config.homeShowDate;
@@ -280,6 +281,7 @@ void WiiUMenuApp::applyHomeOption(const std::string& key, int value) {
         if (!on && m_videoBackdrop) m_videoBackdrop->stop();
         m_videoFocusTitleId = 0;
     }
+    else if (key == "longPressPowerMenu")    m_config.homeLongPressPowerMenu = on;
     else if (key == "videoDim")              m_config.homeVideoDim = std::clamp(value, 0, 2);
     else if (key == "showArchived") {
         m_config.homeShowArchived = on;
@@ -802,21 +804,12 @@ void WiiUMenuApp::showCoverBrowser(std::uint64_t titleId, const std::string& tit
     focusManager().setFocus(m_coverBrowser.get());
 }
 
-void WiiUMenuApp::showPowerMenu() {
+void WiiUMenuApp::showPowerMenu(bool includeSettings) {
     if (!m_contextMenu) return;
     auto& i18n = nxui::I18n::instance();
     if (!m_contextMenu->isActive())
         m_contextMenuReturnFocus = focusManager().current();
     std::vector<ContextMenu::Item> items;
-    items.push_back({i18n.tr("power.shutdown_full", "Power Off"), [this]() {
-        m_contextMenu->hide(false);
-        m_audio.playSfx(Sfx::ConfirmPositive);
-#ifdef SWITCHU_MENU
-        m_launcher.shutdown();
-#else
-        app().requestExit();
-#endif
-    }});
     items.push_back({i18n.tr("power.reboot", "Restart"), [this]() {
         m_contextMenu->hide(false);
         m_audio.playSfx(Sfx::ConfirmPositive);
@@ -826,10 +819,30 @@ void WiiUMenuApp::showPowerMenu() {
         app().requestExit();
 #endif
     }});
-    items.push_back({i18n.tr("sidebar.settings", "Settings"), [this]() {
-        m_contextMenu->hide();
-        if (m_openSettingsAction) m_openSettingsAction();
+    items.push_back({i18n.tr("power.sleep", "Sleep"), [this]() {
+        m_contextMenu->hide(false);
+        m_audio.playSfx(Sfx::ConfirmPositive);
+#ifdef SWITCHU_MENU
+        m_launcher.enterSleep();
+#else
+        app().requestExit();
+#endif
     }});
+    items.push_back({i18n.tr("power.shutdown_full", "Power Off"), [this]() {
+        m_contextMenu->hide(false);
+        m_audio.playSfx(Sfx::ConfirmPositive);
+#ifdef SWITCHU_MENU
+        m_launcher.shutdown();
+#else
+        app().requestExit();
+#endif
+    }});
+    if (includeSettings) {
+        items.push_back({i18n.tr("sidebar.settings", "Settings"), [this]() {
+            m_contextMenu->hide();
+            if (m_openSettingsAction) m_openSettingsAction();
+        }});
+    }
     m_contextMenu->show(centredMenuAnchor(), i18n.tr("power.title", "Power"), std::move(items));
     m_audio.playSfx(Sfx::ModalShow);
     focusManager().setFocus(m_contextMenu.get());

@@ -141,6 +141,7 @@ bool AppConfig::load() {
     readJsonOpt(j, "homeBackgroundImage", homeBackgroundImage);
     readJsonOpt(j, "homePlusAction", homePlusAction);
     readJsonOpt(j, "homeMinusAction", homeMinusAction);
+    readJsonOpt(j, "homeLongPressPowerMenu", homeLongPressPowerMenu);
     readJsonOpt(j, "homeLineStyle", homeLineStyle);
     // A settings file written by an older build has no such key.
     homeDefaultsVersion = 0;
@@ -198,15 +199,23 @@ bool AppConfig::load() {
     homePlusAction = std::clamp(homePlusAction, 0, 1);
     homeMinusAction = std::clamp(homeMinusAction, 0, 1);
     if (homeDefaultsVersion < kHomeDefaultsVersion) {
-        // First start of this build on an existing install: switch to the
-        // minimal single-row look once (centred portrait covers, 12-hour
-        // clock). Everything stays editable in Settings and is never forced
-        // again.
-        appLayoutMode = AppLayoutMode::DynamicLine;
-        homeLineStyle = 2;
-        clockUse12Hour = true;
-        homeClockPosition = 2;
-        homeCoversShown = 5;
+        const int from = homeDefaultsVersion;
+        if (from < 3) {
+            // First start on an existing install: the minimal single-row look
+            // (centred portrait covers, 12-hour clock, bottom bar, 5 covers).
+            appLayoutMode = AppLayoutMode::DynamicLine;
+            homeLineStyle = 2;
+            clockUse12Hour = true;
+            homeClockPosition = 2;
+            homeCoversShown = 5;
+        }
+        if (from < 4) {
+            // - switches the layout again; HOME behaves as originally; holding
+            // HOME opens the power pop-up.
+            homeMinusAction = 1;
+            homeButtonSortMenu = false;
+            homeLongPressPowerMenu = true;
+        }
         homeDefaultsVersion = kHomeDefaultsVersion;
     }
     if (themePreset.empty()) themePreset = "Default Light";
@@ -338,6 +347,7 @@ bool AppConfig::save() const {
     j["homeBackgroundImage"] = homeBackgroundImage;
     j["homePlusAction"] = std::clamp(homePlusAction, 0, 1);
     j["homeMinusAction"] = std::clamp(homeMinusAction, 0, 1);
+    j["homeLongPressPowerMenu"] = homeLongPressPowerMenu;
     j["homeLineStyle"] = std::clamp(homeLineStyle, 0, 2);
     j["homeDefaultsVersion"] = homeDefaultsVersion;
     {

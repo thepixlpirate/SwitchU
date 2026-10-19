@@ -58,7 +58,7 @@ struct AppConfig {
         return 0;
     }
     // HOME button while already on the menu opens the sort pop-up.
-    bool homeButtonSortMenu = true;
+    bool homeButtonSortMenu = false;
     std::vector<std::pair<std::uint64_t, std::uint64_t>> lastOpened;
     std::uint64_t lastOpenedSequence = 0;
 
@@ -129,14 +129,16 @@ struct AppConfig {
     int   homePlusAction = 0;
     // - on HOME: 0 = small power popup (power off / restart / settings),
     //            1 = switch between grid and single row (original).
-    int   homeMinusAction = 0;
+    int   homeMinusAction = 1;
+    // Holding HOME on the menu opens Restart / Sleep / Power Off.
+    bool  homeLongPressPowerMenu = true;
     // Single-row look: 0 = Wii U carousel, 1 = portrait shelf (focus on the
     // left), 2 = portrait, focused cover centred with half-size neighbours.
     int   homeLineStyle = 2;
     // Bumped when new minimal defaults should be applied once to an existing
     // settings file. load() reads 0 for files written by older builds.
-    int   homeDefaultsVersion = 3;
-    static constexpr int kHomeDefaultsVersion = 3;
+    int   homeDefaultsVersion = 4;
+    static constexpr int kHomeDefaultsVersion = 4;
 
     // Games hidden from HOME (Settings > Home Screen lists them to unhide).
     std::vector<std::uint64_t> hiddenTitles;

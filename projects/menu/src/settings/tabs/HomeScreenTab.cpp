@@ -153,6 +153,10 @@ SettingsScreen::Tab settings::tabs::HomeScreenTab::build(SettingsScreen& screen)
                 {i18n.tr("settings.home.minus_power", "Power Menu"),
                  i18n.tr("settings.home.minus_view", "Switch View")},
                 "minusAction", &S::minusAction);
+    addToggle(i18n.tr("settings.home.long_home", "Hold HOME for Power Menu"),
+              i18n.tr("settings.home.long_home_desc",
+                      "Hold the HOME button on the Home screen for Restart, Sleep and Power Off."),
+              "longPressPowerMenu", &S::longPressPowerMenu);
 
     addSelector(i18n.tr("settings.home.sort", "Sort Games"),
                 i18n.tr("settings.home.sort_desc",

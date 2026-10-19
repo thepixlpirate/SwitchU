@@ -389,7 +389,8 @@ private:
     void showQuickGameMenu(GlossyIcon* icon);
     void showCoverBrowser(std::uint64_t titleId, const std::string& title,
                           const std::string& directory);
-    void showPowerMenu();
+    // `includeSettings`: the - button version also offers Settings.
+    void showPowerMenu(bool includeSettings = true);
     // ZL/ZR in the single row: jump a whole screen of games. False when not
     // in the single row (the grid then flips pages as before).
     bool jumpLine(int direction);
