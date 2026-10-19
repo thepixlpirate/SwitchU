@@ -768,6 +768,9 @@ void WiiUMenuApp::showQuickGameMenu(GlossyIcon* icon) {
                          }
                      }});
 #endif
+    // Last row: the same Sort Games pop-up the HOME button opens.
+    items.push_back({i18n.tr("game.quick.sort", "Sort Games") + "  (" + sortModeLabel() + ")",
+                     [this]() { showSortMenu(); }});
 
     nxui::Rect anchor = icon->focusRect();
     if (m_grid && m_grid->isPortraitLine())
