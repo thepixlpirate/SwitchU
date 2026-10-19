@@ -960,9 +960,28 @@ void WiiUMenuApp::processPendingHomeRebuild() {
         return;
     m_homeRebuildPending = false;
     std::uint64_t focusId = 0;
-    if (auto* cur = m_grid->focusManager().current(); cur && cur->tag() == "glossy_icon")
+    if (!m_startupFocusSettled) {
+        // First rebuild after the menu starts: this is where the chosen sort
+        // order is applied. Keeping the focused game here meant whatever game
+        // was first in "My Order" ended up selected halfway down the sorted
+        // list. Start on the first game instead (or the game left open).
+        m_startupFocusSettled = true;
+        focusId = m_launcher.suspendedTitleId();
+    } else if (auto* cur = m_grid->focusManager().current();
+               cur && cur->tag() == "glossy_icon") {
         focusId = static_cast<GlossyIcon*>(cur)->titleId();
+    }
     applyDisplayModel(buildRootFolderModel(), focusId, false, {}, true);
+    if (focusId == 0) {
+        const auto& icons = m_grid->allIcons();
+        for (int i = 0; i < static_cast<int>(icons.size()); ++i) {
+            if (icons[static_cast<std::size_t>(i)] &&
+                icons[static_cast<std::size_t>(i)]->isFocusable()) {
+                m_grid->focusGlobalIndex(i, true);
+                break;
+            }
+        }
+    }
     if (auto* focused = m_grid->focusManager().current())
         focusManager().setFocus(focused);
     updateCursor();

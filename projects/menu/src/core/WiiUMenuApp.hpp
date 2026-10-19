@@ -651,6 +651,7 @@ private:
     std::unordered_map<std::string, std::vector<std::string>> m_iconSwapIndex;
     bool m_iconSwapIndexed = false;
     bool m_homeRebuildPending = false;   // e.g. a game was unhidden in Settings
+    bool m_startupFocusSettled = false;  // first rebuild after start picks the first game
     std::vector<std::string> m_gameOptionsCoverPaths;   // matches the Cover selector
     std::function<void()> m_openThemeShopAction;
     std::function<void()> m_openSettingsAction;
