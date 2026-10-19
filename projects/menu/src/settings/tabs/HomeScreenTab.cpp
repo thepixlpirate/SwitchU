@@ -265,6 +265,30 @@ SettingsScreen::Tab settings::tabs::HomeScreenTab::build(SettingsScreen& screen)
         t.items.push_back(std::move(it));
     }
 
+    // --- Video backgrounds -----------------------------------------------------
+    addSection(i18n.tr("settings.home.section_video", "Game Backgrounds"));
+    addToggle(i18n.tr("settings.home.video_bg", "Per-Game Backgrounds"),
+              i18n.tr("settings.home.video_bg_desc",
+                      "Rest on a game and its own clip or picture fills the screen behind the covers (no sound)."),
+              "videoBackgrounds", &S::videoBackgrounds);
+    addSelector(i18n.tr("settings.home.video_dim", "Clip Darkening"),
+                i18n.tr("settings.home.video_dim_desc",
+                        "Darkens the clip so the clock and game names stay easy to read."),
+                {i18n.tr("settings.home.dim_none", "None"),
+                 i18n.tr("settings.home.dim_light", "Light"),
+                 i18n.tr("settings.home.dim_medium", "Medium")},
+                "videoDim", &S::videoDim);
+    {
+        SettingItem it;
+        it.label = i18n.tr("settings.home.video_info", "Where They Go");
+        it.type = ItemType::Info;
+        it.description = i18n.tr("settings.home.video_info_text",
+            "/config/SwitchU/videos, named by title ID or game name (e.g. Bendy and the Dark Revival.webp). "
+            "Clips: animated WebP, 640x360, 12-15 fps, under 10 MB. Pictures: PNG or JPG, 1280x720. "
+            "A clip wins if a game has both.");
+        t.items.push_back(std::move(it));
+    }
+
     // --- Hidden games --------------------------------------------------------
     addSection(i18n.tr("settings.home.section_hidden", "Hidden Games"));
     if (screen.m_homeOptions.hiddenGames.empty()) {

@@ -222,6 +222,8 @@ void WiiUMenuApp::pushHomeOptionsToSettings() {
     home.sortMode = m_config.sortMode;
     home.homeButtonSortMenu = m_config.homeButtonSortMenu;
     home.showArchived = m_config.homeShowArchived;
+    home.videoBackgrounds = m_config.homeVideoBackgrounds;
+    home.videoDim = m_config.homeVideoDim;
     home.showDate = m_config.homeShowDate;
     home.dateFormat = m_config.homeDateFormat;
     home.plusAction = m_config.homePlusAction;
@@ -273,6 +275,12 @@ void WiiUMenuApp::applyHomeOption(const std::string& key, int value) {
     else if (key == "coversShown")           m_config.homeCoversShown = value >= 1 ? 5 : 3;
     else if (key == "coverShape")            m_config.homeSquareCovers = value == 1;
     else if (key == "homeButtonSortMenu")    m_config.homeButtonSortMenu = on;
+    else if (key == "videoBackgrounds") {
+        m_config.homeVideoBackgrounds = on;
+        if (!on && m_videoBackdrop) m_videoBackdrop->stop();
+        m_videoFocusTitleId = 0;
+    }
+    else if (key == "videoDim")              m_config.homeVideoDim = std::clamp(value, 0, 2);
     else if (key == "showArchived") {
         m_config.homeShowArchived = on;
         m_homeRebuildPending = true;   // applied when Settings closes
@@ -1119,4 +1127,112 @@ void WiiUMenuApp::updateTriggerRepeat(float dt) {
         return;
     m_triggerRepeatTimer = interval;
     jumpLine(right ? +1 : -1);
+}
+
+// ---------------------------------------------------------------------------
+// Video backgrounds
+// ---------------------------------------------------------------------------
+
+void WiiUMenuApp::rebuildVideoIndex() {
+    m_videoIndex.clear();
+    m_videoIndexed = true;
+    m_videoIndexAge = 0.f;
+    constexpr const char* kVideoFolder = "sdmc:/config/SwitchU/videos";
+    std::error_code ec;
+    std::filesystem::create_directories(kVideoFolder, ec);
+    ec.clear();
+    auto addFile = [this](const std::filesystem::path& file,
+                          const std::vector<std::string>& extraKeys) {
+        std::string ext = file.extension().string();
+        std::transform(ext.begin(), ext.end(), ext.begin(),
+                       [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        if (ext != ".webp" && ext != ".png" && ext != ".jpg" && ext != ".jpeg") return;
+        auto keys = indexKeysFor(file.stem().string());
+        keys.insert(keys.end(), extraKeys.begin(), extraKeys.end());
+        for (const auto& key : keys) m_videoIndex[key].push_back(file.string());
+    };
+    std::filesystem::directory_iterator it(kVideoFolder, ec), end;
+    for (; !ec && it != end; it.increment(ec)) {
+        std::error_code typeEc;
+        if (it->is_regular_file(typeEc)) {
+            addFile(it->path(), {});
+        } else if (it->is_directory(typeEc)) {
+            // A folder per game works too: videos/<name or id>/anything.webp
+            const auto folderKeys = indexKeysFor(it->path().filename().string());
+            std::error_code innerEc;
+            std::filesystem::directory_iterator inner(it->path(), innerEc), innerEnd;
+            for (; !innerEc && inner != innerEnd; inner.increment(innerEc)) {
+                std::error_code fileEc;
+                if (inner->is_regular_file(fileEc)) addFile(inner->path(), folderKeys);
+            }
+        }
+    }
+    // A clip (.webp) wins over a still picture for the same game.
+    auto isClip = [](const std::string& p) {
+        std::string lower = p;
+        std::transform(lower.begin(), lower.end(), lower.begin(),
+                       [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        return lower.size() > 5 && lower.compare(lower.size() - 5, 5, ".webp") == 0;
+    };
+    for (auto& [key, list] : m_videoIndex)
+        std::sort(list.begin(), list.end(), [&](const std::string& a, const std::string& b) {
+            if (isClip(a) != isClip(b)) return isClip(a);
+            return a < b;
+        });
+}
+
+std::string WiiUMenuApp::videoPathFor(std::uint64_t titleId, const std::string& title) {
+    if (!m_videoIndexed) rebuildVideoIndex();
+    if (auto found = m_videoIndex.find(titleIdKey(titleId)); found != m_videoIndex.end())
+        return found->second.front();
+    const std::string name = normaliseName(title);
+    if (!name.empty())
+        if (auto found = m_videoIndex.find(name); found != m_videoIndex.end())
+            return found->second.front();
+    return {};
+}
+
+void WiiUMenuApp::updateVideoBackground(float dt) {
+    if (!m_videoBackdrop) return;
+    m_videoBackdrop->setDim(m_config.homeVideoDim == 0 ? 0.f
+                            : m_config.homeVideoDim == 1 ? 0.22f : 0.42f);
+
+    // Look for newly copied clips now and then.
+    m_videoIndexAge += dt;
+    if (m_videoIndexAge > 15.f) m_videoIndexed = false;
+
+    const bool launching = (m_launchAnim && m_launchAnim->isPlaying()) ||
+                           m_leaveCapturePending || m_leaveCaptureDeferred;
+    if (!m_config.homeVideoBackgrounds || launching || !m_grid) {
+        m_videoBackdrop->stop();
+        m_videoFocusTitleId = 0;
+        m_videoBackdrop->pump(dt);
+        return;
+    }
+    // Keep the clip but stop decoding while a menu or window covers HOME.
+    const bool covered = m_navigator.route() != switchu::navigation::Route::Home;
+    m_videoBackdrop->setPaused(covered);
+
+    // Follow the selected game. Moving off games (e.g. to Settings) keeps the
+    // last clip playing.
+    nxui::Widget* cur = m_grid->focusManager().current();
+    if (cur && cur->tag() == "glossy_icon") {
+        auto* icon = static_cast<GlossyIcon*>(cur);
+        const std::uint64_t titleId =
+            icon->entryKind() == GridEntryKind::Application ? icon->titleId() : 0;
+        if (titleId != m_videoFocusTitleId) {
+            m_videoFocusTitleId = titleId;
+            m_videoSettle = 0.f;
+            m_videoBackdrop->stop();   // fade out while moving
+        }
+        const bool scrolling = m_grid->isDynamicLineScrolling() || m_grid->isTransitioning();
+        if (scrolling) m_videoSettle = 0.f;
+        else m_videoSettle += dt;
+        // Start once you rest on a game for a moment (scrolling fast stays smooth).
+        if (titleId != 0 && m_videoSettle >= 0.45f && !covered) {
+            const std::string path = videoPathFor(titleId, icon->title());
+            if (!path.empty()) m_videoBackdrop->play(path);
+        }
+    }
+    m_videoBackdrop->pump(dt);
 }

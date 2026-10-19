@@ -114,6 +114,10 @@ struct AppConfig {
     // Deleted games stay on the console as "archived" records (the Switch's
     // own HOME shows them with a cloud). Off = leave them out of the row.
     bool  homeShowArchived = false;
+    // Looping silent clip of the selected game behind HOME
+    // (sdmc:/config/SwitchU/videos/<title id or name>.webp).
+    bool  homeVideoBackgrounds = true;
+    int   homeVideoDim = 1;   // 0 = none, 1 = light, 2 = medium
     // Outline around the selected game (Themes > Options).
     std::string homeHighlightHex = "#7A1FA8";
     // HOME background: 0 = the theme's own, 1 = solid colour, 2 = picture.

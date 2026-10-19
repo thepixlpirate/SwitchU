@@ -62,6 +62,8 @@ public:
         int  sortMode = 0;           // see AppConfig::sortMode
         bool homeButtonSortMenu = true;
         bool showArchived = false;
+        bool videoBackgrounds = true;
+        int  videoDim = 1;
         bool showDate = false;
         int  dateFormat = 0;         // 0 = month/day/year, 1 = day/month/year
         int  plusAction = 0;         // 0 = quick popup, 1 = full options

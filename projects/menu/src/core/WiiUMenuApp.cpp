@@ -4411,6 +4411,8 @@ void WiiUMenuApp::buildGrid() {
     // Themes > Options background (solid colour / picture) over the theme's.
     m_homeBackdrop = std::make_shared<HomeBackdrop>();
     m_bgLayer->addChild(m_homeBackdrop);
+    m_videoBackdrop = std::make_shared<VideoBackdrop>(app().gpu(), app().renderer(), m_threadPool);
+    m_bgLayer->addChild(m_videoBackdrop);
     m_steamGridDbBackdrop = std::make_shared<SteamGridDbBackdrop>(
         app().gpu(), app().renderer(), &m_threadPool);
     m_steamGridDbBackdrop->setEnabled(m_config.steamGridDbEnabled);
@@ -5194,6 +5196,7 @@ void WiiUMenuApp::onUpdateAwake(float dt) {
     processPendingHomeRebuild();
     pollHomeBackground();
     updateTriggerRepeat(dt);
+    updateVideoBackground(dt);
     syncFolderHeader();
 
 #ifdef NXUI_BACKEND_DEKO3D

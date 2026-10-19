@@ -21,6 +21,7 @@
 #include "widgets/CoverBrowser.hpp"
 #include "widgets/ColorPicker.hpp"
 #include "widgets/HomeBackdrop.hpp"
+#include "widgets/VideoBackdrop.hpp"
 #include "widgets/ProgressDialog.hpp"
 #include "widgets/AppletButton.hpp"
 #include "widgets/PageIndicator.hpp"
@@ -410,6 +411,10 @@ private:
     void applyHomeBackground();
     void pollHomeBackground();
     nxui::Color highlightColor() const;
+    // Silent looping clip of the selected game behind HOME.
+    void updateVideoBackground(float dt);
+    std::string videoPathFor(std::uint64_t titleId, const std::string& title);
+    void rebuildVideoIndex();
     void confirmDeleteSoftware(std::uint64_t titleId, const std::string& title);
     void syncPortraitCovers();
     void pollPortraitCovers();
@@ -476,6 +481,12 @@ private:
     std::shared_ptr<ColorPicker>       m_colorPicker;
     std::string                        m_colorPickerTarget;   // "highlight" | "background"
     std::shared_ptr<HomeBackdrop>      m_homeBackdrop;
+    std::shared_ptr<VideoBackdrop>     m_videoBackdrop;
+    std::unordered_map<std::string, std::vector<std::string>> m_videoIndex;
+    bool                               m_videoIndexed = false;
+    float                              m_videoIndexAge = 0.f;
+    std::uint64_t                      m_videoFocusTitleId = 0;
+    float                              m_videoSettle = 0.f;
     std::unique_ptr<nxui::Texture>     m_homeBackgroundTexture;
     std::string                        m_homeBackgroundLoadedPath;
     struct BackgroundDecode {
