@@ -94,6 +94,13 @@ SettingsScreen::Tab settings::tabs::HomeScreenTab::build(SettingsScreen& screen)
                 {i18n.tr("settings.home.shape_portrait", "Portrait"),
                  i18n.tr("settings.home.shape_square", "Square")},
                 "coverShape", &S::coverShape);
+    addSelector(i18n.tr("settings.home.grid_shape", "Grid Icon Shape"),
+                i18n.tr("settings.home.grid_shape_desc",
+                        "Used when Game Layout is Grid. Tall covers only fit with 1 or 2 rows; "
+                        "3 or more rows always use the square icons."),
+                {i18n.tr("settings.home.shape_square", "Square"),
+                 i18n.tr("settings.home.shape_tall", "Tall Covers")},
+                "gridShape", &S::gridShape);
     {
         SettingItem it;
         it.label = i18n.tr("settings.display.grid_rows", "Home Grid Rows");

@@ -133,14 +133,18 @@ float IconGrid::centeredOffsetX(float d) const {
 }
 
 void IconGrid::syncIconStyles() {
-    const bool portrait = isPortraitLine();
+    const bool line = isPortraitLine();
+    const bool grid = isPortraitGrid();
     for (auto& icon : m_allIcons) {
         if (!icon) continue;
-        icon->setPortraitStyle(portrait);
-        // Empty "add here" slots are invisible in the portrait row, so the
-        // cursor must not land on them either.
-        if (icon->entryKind() == GridEntryKind::Empty)
-            icon->setFocusable(!portrait);
+        if (icon->entryKind() == GridEntryKind::Empty) {
+            // Empty "add here" slots: invisible (and unreachable) in the
+            // portrait row; in a tall grid they keep their normal outline.
+            icon->setPortraitStyle(line);
+            icon->setFocusable(!line);
+            continue;
+        }
+        icon->setPortraitStyle(line || grid);
     }
 }
 

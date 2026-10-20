@@ -48,6 +48,11 @@ public:
     bool isPortraitLine() const {
         return m_layoutMode == AppLayoutMode::DynamicLine && m_lineStyle >= 1;
     }
+    // Tall covers in the grid (Settings > Home Screen > Grid Icon Shape).
+    void setGridPortrait(bool on) { if (m_gridPortrait != on) { m_gridPortrait = on; syncIconStyles(); } }
+    bool isPortraitGrid() const { return m_layoutMode == AppLayoutMode::Grid && m_gridPortrait; }
+    // Any layout showing tall cover art.
+    bool usesPortraitCovers() const { return isPortraitLine() || isPortraitGrid(); }
     // Where the focused portrait card rests (for placing the game name).
     nxui::Rect portraitFocusRestRect() const;
     void setDynamicLineUpTarget(nxui::Widget* target);
@@ -147,6 +152,7 @@ private:
 
     AppLayoutMode m_layoutMode = AppLayoutMode::Grid;
     int m_lineStyle = 0;
+    bool m_gridPortrait = false;
     int m_centerShown = 5;
     bool m_centerBarBottom = true;
     bool m_squareCovers = false;

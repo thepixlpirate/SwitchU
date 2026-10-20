@@ -384,6 +384,8 @@ private:
     void pushHomeOptionsToSettings();
     void layoutTopHud();
     void applyBottomBarNavigation();
+    // Tall covers in the grid: only on the HOME grid with 1-2 rows.
+    bool gridPortraitActive(int rows = -1) const;
     void openThemeShopScreen();
     // Small pop-ups: + on a game, - on HOME, and a file browser for covers.
     void showQuickGameMenu(GlossyIcon* icon);

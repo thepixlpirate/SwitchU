@@ -59,6 +59,7 @@ public:
         bool showBattery = true;
         int  coversShownIndex = 1;   // 0 = 3 covers, 1 = 5 covers
         int  coverShape = 0;         // 0 = portrait 2:3, 1 = square 1:1
+        int  gridShape = 0;          // grid: 0 = square, 1 = tall (1-2 rows)
         int  sortMode = 0;           // see AppConfig::sortMode
         bool homeButtonSortMenu = false;
         bool showArchived = false;

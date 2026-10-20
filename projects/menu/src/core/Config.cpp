@@ -132,6 +132,7 @@ bool AppConfig::load() {
     readJsonOpt(j, "homeShowBattery", homeShowBattery);
     readJsonOpt(j, "homeCoversShown", homeCoversShown);
     readJsonOpt(j, "homeSquareCovers", homeSquareCovers);
+    readJsonOpt(j, "homeGridShape", homeGridShape);
     readJsonOpt(j, "homeShowArchived", homeShowArchived);
     readJsonOpt(j, "homeVideoBackgrounds", homeVideoBackgrounds);
     readJsonOpt(j, "homeVideoDim", homeVideoDim);
@@ -342,6 +343,7 @@ bool AppConfig::save() const {
     j["homeShowBattery"] = homeShowBattery;
     j["homeCoversShown"] = homeCoversShown >= 5 ? 5 : 3;
     j["homeSquareCovers"] = homeSquareCovers;
+    j["homeGridShape"] = std::clamp(homeGridShape, 0, 1);
     j["homeShowArchived"] = homeShowArchived;
     j["homeVideoBackgrounds"] = homeVideoBackgrounds;
     j["homeVideoDim"] = std::clamp(homeVideoDim, 0, 2);

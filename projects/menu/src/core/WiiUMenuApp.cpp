@@ -1143,8 +1143,10 @@ WiiUMenuApp::GridLayoutMetrics WiiUMenuApp::computeGridLayoutMetrics(int cols,
     cols = std::clamp(cols, 1, 8);
     rows = std::clamp(rows, 1, 5);
 
+    // Tall (2:3) cells for the cover grid; square otherwise.
+    const float baseCellH = gridPortraitActive(rows) ? kGridBaseCellW * 1.5f : kGridBaseCellH;
     const float baseGridW = cols * kGridBaseCellW + (cols - 1) * kGridBasePadX;
-    const float baseGridH = rows * kGridBaseCellH + (rows - 1) * kGridBasePadY;
+    const float baseGridH = rows * baseCellH + (rows - 1) * kGridBasePadY;
 
     const float safeW = std::max(1.f, kGridRectW - (kGridSafeSideMargin * 2.f));
     const float safeH = std::max(1.f, kGridRectH - (kGridSafeTopBottomMargin * 2.f));
@@ -1155,7 +1157,7 @@ WiiUMenuApp::GridLayoutMetrics WiiUMenuApp::computeGridLayoutMetrics(int cols,
 
     GridLayoutMetrics m;
     m.cellW = std::max(88.f, kGridBaseCellW * scale);
-    m.cellH = std::max(88.f, kGridBaseCellH * scale);
+    m.cellH = std::max(88.f, baseCellH * scale);
     m.padX = std::max(8.f, kGridBasePadX * scale);
     m.padY = std::max(8.f, kGridBasePadY * scale);
     return m;
@@ -1297,6 +1299,7 @@ void WiiUMenuApp::reflowHomeGrid() {
 
     GridLayoutMetrics gridMetrics = computeGridLayoutMetrics();
     m_grid->setSlideTransition(m_config.pageTransitionMode == 0);
+    m_grid->setGridPortrait(gridPortraitActive());
     m_grid->setup(std::move(icons), cols, rows,
                   gridMetrics.cellW, gridMetrics.cellH,
                   gridMetrics.padX, gridMetrics.padY);
@@ -2068,6 +2071,7 @@ void WiiUMenuApp::applyDisplayModel(GridModel model, std::uint64_t focusId, bool
     m_grid->setEdgePaging(inFolder);
     m_grid->setSlideTransition(m_config.pageTransitionMode == 0);
     m_grid->setLayoutMode(m_appLayoutMode);
+    m_grid->setGridPortrait(gridPortraitActive());
     m_grid->setup(std::move(icons), columns, rows, metrics.cellW, metrics.cellH,
                   metrics.padX, metrics.padY);
     wireFocusCallback();
@@ -4095,6 +4099,7 @@ void WiiUMenuApp::buildGrid() {
     // mode has to be applied here too: without it the first page changes after
     // boot ignored the Translate setting until a rebuild happened to fix it.
     m_grid->setSlideTransition(m_config.pageTransitionMode == 0);
+    m_grid->setGridPortrait(gridPortraitActive());
     m_grid->setup(std::move(icons),
                   std::clamp(m_config.gridColumns, 1, 8),
                   std::clamp(m_config.gridRows, 1, 5),
@@ -5029,6 +5034,7 @@ void WiiUMenuApp::finalizeRefresh() {
     GridLayoutMetrics gridMetrics = computeGridLayoutMetrics();
 
     m_grid->setSlideTransition(m_config.pageTransitionMode == 0);
+    m_grid->setGridPortrait(gridPortraitActive());
     m_grid->setup(std::move(icons),
                   std::clamp(m_config.gridColumns, 1, 8),
                   std::clamp(m_config.gridRows, 1, 5),

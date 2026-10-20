@@ -26,9 +26,6 @@ constexpr const char* kPortraitFolder = "sdmc:/config/SwitchU/portraits";
 // Big enough for the largest card (360x540) to stay sharp.
 constexpr int kPortraitDecodeW = 400;
 constexpr int kPortraitDecodeH = 600;
-// Covers kept around the focused game: a little behind, more ahead.
-constexpr int kPortraitKeepBehind = 3;
-constexpr int kPortraitKeepAhead = 8;
 // Released in batches so the GPU is not drained on every scroll step.
 constexpr std::size_t kPortraitReleaseBatch = 16;
 
@@ -202,8 +199,12 @@ void WiiUMenuApp::applyHomeChromeOptions() {
         m_grid->setSquareCovers(m_config.homeSquareCovers);
     }
     configureDynamicLineNavigation();
-    if (m_grid && (!m_grid->isPortraitLine() || m_config.homeSquareCovers))
-        releasePortraitCovers(true);
+    if (m_grid) {
+        m_grid->setGridPortrait(gridPortraitActive());
+        const bool covers = (m_grid->isPortraitLine() && !m_config.homeSquareCovers) ||
+                            m_grid->isPortraitGrid();
+        if (!covers) releasePortraitCovers(true);
+    }
     syncPortraitTitlePlacement();
     updateCursor();
 }
@@ -219,6 +220,7 @@ void WiiUMenuApp::pushHomeOptionsToSettings() {
     home.showBattery = m_config.homeShowBattery;
     home.coversShownIndex = m_config.homeCoversShown >= 5 ? 1 : 0;
     home.coverShape = m_config.homeSquareCovers ? 1 : 0;
+    home.gridShape = m_config.homeGridShape;
     home.sortMode = m_config.sortMode;
     home.homeButtonSortMenu = m_config.homeButtonSortMenu;
     home.showArchived = m_config.homeShowArchived;
@@ -281,6 +283,10 @@ void WiiUMenuApp::applyHomeOption(const std::string& key, int value) {
     else if (key == "showBattery")           m_config.homeShowBattery = on;
     else if (key == "coversShown")           m_config.homeCoversShown = value >= 1 ? 5 : 3;
     else if (key == "coverShape")            m_config.homeSquareCovers = value == 1;
+    else if (key == "gridShape") {
+        m_config.homeGridShape = std::clamp(value, 0, 1);
+        m_homeRebuildPending = true;   // new cell size, applied when Settings closes
+    }
     else if (key == "homeButtonSortMenu")    m_config.homeButtonSortMenu = on;
     else if (key == "videoBackgrounds") {
         m_config.homeVideoBackgrounds = on;
@@ -534,6 +540,21 @@ std::string WiiUMenuApp::portraitSourcePath(std::uint64_t titleId, const std::st
     return candidates.empty() ? std::string() : candidates.front();
 }
 
+// Which icons need their cover: around the focus in the single row; the whole
+// visible page (plus the next one) in the grid.
+static void portraitWindow(const IconGrid& grid, int& lo, int& hi) {
+    const int count = static_cast<int>(grid.allIcons().size());
+    if (grid.isPortraitGrid()) {
+        const int perPage = std::max(1, grid.iconsPerPage());
+        lo = grid.currentPage() * perPage;
+        hi = std::min(count - 1, lo + perPage * 2 - 1);
+    } else {
+        const int focus = std::max(0, grid.focusedGlobalIndex());
+        lo = std::max(0, focus - 3);
+        hi = std::min(count - 1, focus + 8);
+    }
+}
+
 void WiiUMenuApp::releasePortraitCovers(bool all) {
     if (all) {
         if (m_portraitDecode)
@@ -551,9 +572,8 @@ void WiiUMenuApp::releasePortraitCovers(bool all) {
         if (m_portraitCovers.size() < kPortraitReleaseBatch || !m_grid)
             return;
         const auto& icons = m_grid->allIcons();
-        const int focus = std::max(0, m_grid->focusedGlobalIndex());
-        const int lo = focus - kPortraitKeepBehind;
-        const int hi = focus + kPortraitKeepAhead;
+        int lo = 0, hi = -1;
+        portraitWindow(*m_grid, lo, hi);
         std::unordered_map<std::uint64_t, bool> keep;
         for (int i = std::max(0, lo); i <= hi && i < (int)icons.size(); ++i)
             if (icons[(std::size_t)i]) keep[icons[(std::size_t)i]->titleId()] = true;
@@ -631,7 +651,9 @@ void WiiUMenuApp::pollPortraitCovers() {
 
 void WiiUMenuApp::syncPortraitCovers() {
     // Square cards use each game's own icon, so no cover art is loaded.
-    if (!m_grid || !m_grid->isPortraitLine() || m_config.homeSquareCovers) {
+    const bool wanted = m_grid &&
+        ((m_grid->isPortraitLine() && !m_config.homeSquareCovers) || m_grid->isPortraitGrid());
+    if (!wanted) {
         if (!m_portraitCovers.empty())
             releasePortraitCovers(true);
         return;
@@ -654,8 +676,8 @@ void WiiUMenuApp::syncPortraitCovers() {
     const int focus = std::max(0, m_grid->focusedGlobalIndex());
 
     // Hand loaded covers to the icons in view (icons are rebuilt often).
-    const int lo = std::max(0, focus - kPortraitKeepBehind);
-    const int hi = std::min((int)icons.size() - 1, focus + kPortraitKeepAhead);
+    int lo = 0, hi = -1;
+    portraitWindow(*m_grid, lo, hi);
     for (int i = lo; i <= hi; ++i) {
         const auto& icon = icons[(std::size_t)i];
         if (!icon) continue;
@@ -670,10 +692,17 @@ void WiiUMenuApp::syncPortraitCovers() {
     if (m_portraitFuture.valid())
         return;   // one decode at a time
 
-    // Next cover to load: the focused one first, then its neighbours.
+    // Next cover to load: the focused one first, then its neighbours (single
+    // row) or the rest of the page (grid).
     static constexpr int kOrder[] = {0, 1, -1, 2, -2, 3, 4, -3, 5, 6, 7, 8};
-    for (int offset : kOrder) {
-        const int i = focus + offset;
+    std::vector<int> order;
+    if (m_grid->isPortraitGrid()) {
+        order.push_back(focus);
+        for (int i = lo; i <= hi; ++i) order.push_back(i);
+    } else {
+        for (int offset : kOrder) order.push_back(focus + offset);
+    }
+    for (int i : order) {
         if (i < 0 || i >= (int)icons.size()) continue;
         const auto& icon = icons[(std::size_t)i];
         if (!icon || icon->entryKind() != GridEntryKind::Application) continue;
@@ -1276,4 +1305,12 @@ void WiiUMenuApp::updateVideoBackground(float dt) {
         }
     }
     m_videoBackdrop->pump(dt);
+}
+
+bool WiiUMenuApp::gridPortraitActive(int rows) const {
+    if (rows < 0) rows = std::clamp(m_config.gridRows, 1, 5);
+    // Tall covers only fit on the HOME grid with 1-2 rows; folders and
+    // anything taller always use the square icons.
+    return m_config.homeGridShape == 1 && rows <= 2 && m_openFolderId == 0 &&
+           m_appLayoutMode == AppLayoutMode::Grid;
 }

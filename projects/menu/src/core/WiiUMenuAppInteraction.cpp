@@ -2057,7 +2057,7 @@ void WiiUMenuApp::updateCursor() {
         // directly avoids a second easing curve that would visibly lag behind.
         const bool carouselScrolling = movingLineFocus
                                     && (morphing || m_grid->isDynamicLineScrolling());
-        const bool portrait = m_grid && m_grid->isPortraitLine() && !m_editMode;
+        const bool portrait = m_grid && m_grid->usesPortraitCovers() && !m_editMode;
         m_cursor->setPlainStyle(portrait);
         if (portrait) {
             // Switch look: a solid purple frame hugging the cover.

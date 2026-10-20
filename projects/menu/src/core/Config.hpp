@@ -111,6 +111,8 @@ struct AppConfig {
     // Card shape in the portrait styles: false = tall 2:3 covers,
     // true = square 1:1 game icons.
     bool  homeSquareCovers = false;
+    // Grid icons: 0 = square game icons, 1 = tall covers (1-2 rows only).
+    int   homeGridShape = 0;
     // Deleted games stay on the console as "archived" records (the Switch's
     // own HOME shows them with a cloud). Off = leave them out of the row.
     bool  homeShowArchived = false;
