@@ -136,6 +136,9 @@ bool AppConfig::load() {
     readJsonOpt(j, "homeShowArchived", homeShowArchived);
     readJsonOpt(j, "homeVideoBackgrounds", homeVideoBackgrounds);
     readJsonOpt(j, "homeVideoDim", homeVideoDim);
+    readJsonOpt(j, "pirateFoilAddress", pirateFoilAddress);
+    readJsonOpt(j, "pirateFoilApiKey", pirateFoilApiKey);
+    readJsonOpt(j, "pirateFoilLastSync", pirateFoilLastSync);
     readJsonOpt(j, "homeHighlightHex", homeHighlightHex);
     readJsonOpt(j, "homeBackgroundMode", homeBackgroundMode);
     readJsonOpt(j, "homeBackgroundHex", homeBackgroundHex);
@@ -347,6 +350,9 @@ bool AppConfig::save() const {
     j["homeShowArchived"] = homeShowArchived;
     j["homeVideoBackgrounds"] = homeVideoBackgrounds;
     j["homeVideoDim"] = std::clamp(homeVideoDim, 0, 2);
+    j["pirateFoilAddress"] = pirateFoilAddress;
+    j["pirateFoilApiKey"] = pirateFoilApiKey;
+    j["pirateFoilLastSync"] = pirateFoilLastSync;
     j["homeHighlightHex"] = homeHighlightHex;
     j["homeBackgroundMode"] = std::clamp(homeBackgroundMode, 0, 2);
     j["homeBackgroundHex"] = homeBackgroundHex;

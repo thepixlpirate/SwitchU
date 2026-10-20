@@ -23,6 +23,7 @@
 #include "widgets/HomeBackdrop.hpp"
 #include "widgets/VideoBackdrop.hpp"
 #include "widgets/ProgressDialog.hpp"
+#include "core/PirateFoilSync.hpp"
 #include "widgets/AppletButton.hpp"
 #include "widgets/PageIndicator.hpp"
 #include "widgets/ProfileCarouselScreen.hpp"
@@ -418,6 +419,12 @@ private:
     nxui::Color highlightColor() const;
     // Silent looping clip of the selected game behind HOME.
     void updateVideoBackground(float dt);
+    // PirateFoil background sync (Settings > Home Screen > Game Backgrounds).
+    void editPirateFoilAddress();
+    void editPirateFoilApiKey();
+    void startPirateFoilSync();
+    void pollPirateFoilSync();
+    void refreshHomeSettingsTab();
     std::string videoPathFor(std::uint64_t titleId, const std::string& title);
     void rebuildVideoIndex();
     void confirmDeleteSoftware(std::uint64_t titleId, const std::string& title);
@@ -492,6 +499,10 @@ private:
     float                              m_videoIndexAge = 0.f;
     std::uint64_t                      m_videoFocusTitleId = 0;
     float                              m_videoSettle = 0.f;
+    std::future<piratefoil::Result>    m_pirateFoilFuture;
+    std::shared_ptr<piratefoil::Progress> m_pirateFoilProgress;
+    std::shared_ptr<std::atomic<bool>> m_pirateFoilCancel;
+    std::uint64_t                      m_pirateFoilUiRevision = 0;
     std::unique_ptr<nxui::Texture>     m_homeBackgroundTexture;
     std::string                        m_homeBackgroundLoadedPath;
     struct BackgroundDecode {

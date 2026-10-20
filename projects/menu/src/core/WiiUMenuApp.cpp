@@ -5278,6 +5278,7 @@ void WiiUMenuApp::onUpdateAwake(float dt) {
 #endif
 
     syncSteamGridDb();
+    pollPirateFoilSync();
 
     // Dynamic-line navigation owns a small internal focus manager. Depending
     // on the route transition, its selected icon can change without producing

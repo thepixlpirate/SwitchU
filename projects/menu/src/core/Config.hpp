@@ -120,6 +120,10 @@ struct AppConfig {
     // (sdmc:/config/SwitchU/videos/<title id or name>.webp).
     bool  homeVideoBackgrounds = true;
     int   homeVideoDim = 1;   // 0 = none, 1 = light, 2 = medium
+    // Sync backgrounds from PirateFoil (manual Sync Now only).
+    std::string pirateFoilAddress;
+    std::string pirateFoilApiKey;
+    std::string pirateFoilLastSync;   // "<date time> - <result>"
     // Outline around the selected game (Themes > Options).
     std::string homeHighlightHex = "#7A1FA8";
     // HOME background: 0 = the theme's own, 1 = solid colour, 2 = picture.

@@ -13,6 +13,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <ctime>
 #include <filesystem>
 #include <system_error>
 #include <vector>
@@ -228,6 +229,10 @@ void WiiUMenuApp::pushHomeOptionsToSettings() {
     home.debugWindow = m_showDebugOverlay;
     home.videoBackgrounds = m_config.homeVideoBackgrounds;
     home.videoDim = m_config.homeVideoDim;
+    home.pirateFoilAddress = m_config.pirateFoilAddress;
+    home.pirateFoilHasKey = !m_config.pirateFoilApiKey.empty();
+    home.pirateFoilLastSync = m_config.pirateFoilLastSync;
+    home.pirateFoilSyncing = m_pirateFoilFuture.valid();
     home.showDate = m_config.homeShowDate;
     home.dateFormat = m_config.homeDateFormat;
     home.plusAction = m_config.homePlusAction;
@@ -273,6 +278,9 @@ void WiiUMenuApp::applyHomeOption(const std::string& key, int value) {
         openThemeShopScreen();
         return;
     }
+    if (key == "pfAddress") { editPirateFoilAddress(); return; }
+    if (key == "pfApiKey")  { editPirateFoilApiKey(); return; }
+    if (key == "pfSync")    { startPirateFoilSync(); return; }
     if (key.rfind("unhide:", 0) == 0) {
         unhideTitle(std::strtoull(key.c_str() + 7, nullptr, 16));
         return;
@@ -1313,4 +1321,171 @@ bool WiiUMenuApp::gridPortraitActive(int rows) const {
     // anything taller always use the square icons.
     return m_config.homeGridShape == 1 && rows <= 2 && m_openFolderId == 0 &&
            m_appLayoutMode == AppLayoutMode::Grid;
+}
+
+// ---------------------------------------------------------------------------
+// PirateFoil background sync. Runs only from Settings > Sync Now.
+// ---------------------------------------------------------------------------
+
+void WiiUMenuApp::refreshHomeSettingsTab() {
+    pushHomeOptionsToSettings();
+    if (m_settings && m_settings->isActive()) m_settings->rebuildCurrentTab();
+}
+
+void WiiUMenuApp::editPirateFoilAddress() {
+    requestTextEntry("PirateFoil Address", "e.g. https://switch.example.com or http://192.168.0.185:8081",
+        m_config.pirateFoilAddress, 256, false,
+        [this](const std::string& value) {
+            m_config.pirateFoilAddress = piratefoil::normaliseAddress(value);
+            m_config.save();
+            refreshHomeSettingsTab();
+            if (m_settings)
+                m_settings->requestToast(m_config.pirateFoilAddress.empty()
+                    ? "PirateFoil Address cleared." : "PirateFoil Address saved.");
+        });
+}
+
+void WiiUMenuApp::editPirateFoilApiKey() {
+    requestTextEntry("PirateFoil API Key", "Enter the API key from PirateFoil",
+        m_config.pirateFoilApiKey, 256, true,
+        [this](const std::string& value) {
+            std::string key = value;
+            auto notSpace = [](unsigned char c) { return !std::isspace(c); };
+            key.erase(key.begin(), std::find_if(key.begin(), key.end(), notSpace));
+            key.erase(std::find_if(key.rbegin(), key.rend(), notSpace).base(), key.end());
+            m_config.pirateFoilApiKey = key;
+            m_config.save();
+            refreshHomeSettingsTab();
+            if (m_settings)
+                m_settings->requestToast(key.empty() ? "PirateFoil API Key cleared."
+                                                     : "PirateFoil API Key saved.");
+        });
+}
+
+void WiiUMenuApp::startPirateFoilSync() {
+    auto toast = [this](const std::string& msg) {
+        if (m_settings) m_settings->requestToast(msg, 3.f);
+    };
+    if (m_pirateFoilFuture.valid()) { toast("A sync is already running."); return; }
+    if (m_config.pirateFoilAddress.empty()) { toast("Set PirateFoil Address first."); return; }
+    if (m_config.pirateFoilApiKey.empty()) { toast("Set PirateFoil API Key first."); return; }
+
+    // Let go of the playing clip; its file may be replaced.
+    if (m_videoBackdrop) m_videoBackdrop->stop();
+    m_videoFocusTitleId = 0;
+
+    auto progress = std::make_shared<piratefoil::Progress>();
+    progress->message = "Contacting PirateFoil...";
+    auto cancel = std::make_shared<std::atomic<bool>>(false);
+    m_pirateFoilProgress = progress;
+    m_pirateFoilCancel = cancel;
+    m_pirateFoilUiRevision = 0;
+    if (m_progressDialog) {
+        m_progressDialog->setTheme(&m_theme);
+        m_progressDialog->setCancellable(true, [this]() {
+            if (m_pirateFoilCancel) m_pirateFoilCancel->store(true);
+            if (m_progressDialog) m_progressDialog->updateState("Cancelling...", -1.f);
+        });
+        m_progressDialog->show("Syncing from PirateFoil", progress->message, -1.f);
+        focusManager().setFocus(m_progressDialog.get());
+    }
+    const std::string address = m_config.pirateFoilAddress;
+    const std::string key = m_config.pirateFoilApiKey;
+    m_pirateFoilFuture = std::async(std::launch::async, [address, key, progress, cancel]() {
+        try {
+            return piratefoil::runSync(address, key, progress, cancel);
+        } catch (const std::exception& ex) {
+            piratefoil::Result r;
+            r.error = std::string("Sync failed: ") + ex.what();
+            return r;
+        } catch (...) {
+            piratefoil::Result r;
+            r.error = "Sync failed.";
+            return r;
+        }
+    });
+}
+
+void WiiUMenuApp::pollPirateFoilSync() {
+    if (!m_pirateFoilFuture.valid()) return;
+    if (m_pirateFoilProgress && m_progressDialog && m_progressDialog->isActive()) {
+        std::string message;
+        float value = -1.f;
+        std::uint64_t revision = 0;
+        {
+            std::lock_guard<std::mutex> lock(m_pirateFoilProgress->mutex);
+            message = m_pirateFoilProgress->message;
+            value = m_pirateFoilProgress->progress01;
+            revision = m_pirateFoilProgress->revision;
+        }
+        const bool cancelling = m_pirateFoilCancel && m_pirateFoilCancel->load();
+        if (revision != m_pirateFoilUiRevision && !cancelling) {
+            m_pirateFoilUiRevision = revision;
+            m_progressDialog->updateState(message, value);
+        }
+        if (focusManager().current() != m_progressDialog.get())
+            focusManager().setFocus(m_progressDialog.get());
+    }
+    if (m_pirateFoilFuture.wait_for(std::chrono::seconds(0)) != std::future_status::ready)
+        return;
+
+    const piratefoil::Result result = m_pirateFoilFuture.get();
+    m_pirateFoilProgress.reset();
+    m_pirateFoilCancel.reset();
+    if (m_progressDialog) {
+        m_progressDialog->setCancellable(false);
+        m_progressDialog->hide();
+    }
+    if (m_settings && m_settings->isActive())
+        focusManager().setFocus(m_settings.get());
+
+    // New files show straight away (no restart): re-scan the folder and
+    // restart the backdrop for whatever game is selected.
+    m_videoIndexed = false;
+    if (m_videoBackdrop) m_videoBackdrop->stop();
+    m_videoFocusTitleId = 0;
+
+    // "Oct 19, 2026 3:42 PM"
+    std::time_t now = std::time(nullptr);
+    std::tm local{};
+    localtime_r(&now, &local);
+    char datePart[24]{};
+    std::strftime(datePart, sizeof(datePart), "%b %d, %Y", &local);
+    char timePart[16]{};
+    if (m_config.clockUse12Hour) {
+        const int hour12 = local.tm_hour % 12 == 0 ? 12 : local.tm_hour % 12;
+        std::snprintf(timePart, sizeof(timePart), "%d:%02d %s", hour12, local.tm_min,
+                      local.tm_hour < 12 ? "AM" : "PM");
+    } else {
+        std::snprintf(timePart, sizeof(timePart), "%02d:%02d", local.tm_hour, local.tm_min);
+    }
+    const std::string whenText = std::string(datePart) + " " + timePart;
+
+    std::string outcome;
+    std::string title;
+    if (!result.ok) {
+        title = result.cancelled ? "Sync Cancelled" : "Sync Failed";
+        outcome = result.error.empty() ? "Failed." : result.error;
+    } else {
+        const std::string summary = piratefoil::summaryText(result);
+        if (result.cancelled) {
+            title = "Sync Cancelled";
+            outcome = "Cancelled: " + summary;
+        } else {
+            title = result.failed > 0 ? "Sync Finished with Problems" : "Sync Complete";
+            outcome = summary;
+            if (result.added + result.updated + result.removed + result.failed == 0)
+                outcome += " (everything was already up to date)";
+        }
+        if (!result.error.empty()) outcome += ". " + result.error;
+    }
+    m_config.pirateFoilLastSync = whenText + " - " + outcome;
+    m_config.save();
+    refreshHomeSettingsTab();
+
+    if (m_settings && m_settings->isActive()) {
+        m_settings->requestDialog(title, outcome, {{"OK", {}}});
+    } else if (m_settings) {
+        m_settings->requestToast(outcome, 4.f);
+    }
 }

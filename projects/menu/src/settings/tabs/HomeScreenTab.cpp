@@ -298,6 +298,52 @@ SettingsScreen::Tab settings::tabs::HomeScreenTab::build(SettingsScreen& screen)
             "A clip wins if a game has both.");
         t.items.push_back(std::move(it));
     }
+    // PirateFoil: only downloads when Sync Now is pressed.
+    {
+        SettingItem it;
+        it.label = i18n.tr("settings.home.pf_address", "PirateFoil Address");
+        it.buttonLabel = i18n.tr("button.configure", "Configure");
+        it.type = ItemType::Action;
+        it.description = screen.m_homeOptions.pirateFoilAddress.empty()
+            ? i18n.tr("settings.home.pf_address_none",
+                      "Not set. e.g. https://switch.example.com or http://192.168.0.185:8081")
+            : screen.m_homeOptions.pirateFoilAddress;
+        it.onChange = [notify](SettingItem&) { notify("pfAddress", 1); };
+        t.items.push_back(std::move(it));
+    }
+    {
+        SettingItem it;
+        it.label = i18n.tr("settings.home.pf_key", "PirateFoil API Key");
+        it.buttonLabel = i18n.tr("button.configure", "Configure");
+        it.type = ItemType::Action;
+        it.description = screen.m_homeOptions.pirateFoilHasKey
+            ? i18n.tr("settings.home.pf_key_set", "******** (set, hidden)")
+            : i18n.tr("settings.home.pf_key_none", "Not set");
+        it.onChange = [notify](SettingItem&) { notify("pfApiKey", 1); };
+        t.items.push_back(std::move(it));
+    }
+    {
+        SettingItem it;
+        it.label = i18n.tr("settings.home.pf_sync", "Sync Now");
+        it.buttonLabel = i18n.tr("settings.home.pf_sync_button", "Sync");
+        it.type = ItemType::Action;
+        it.description = i18n.tr("settings.home.pf_sync_desc",
+            "Downloads new and changed backgrounds from PirateFoil and removes ones deleted there. "
+            "Your own files in the videos folder are never touched. Nothing syncs automatically.");
+        it.onChange = [notify](SettingItem&) { notify("pfSync", 1); };
+        t.items.push_back(std::move(it));
+    }
+    {
+        SettingItem it;
+        it.label = i18n.tr("settings.home.pf_last", "Last Sync");
+        it.type = ItemType::Info;
+        it.description = screen.m_homeOptions.pirateFoilSyncing
+            ? i18n.tr("settings.home.pf_syncing", "Syncing...")
+            : screen.m_homeOptions.pirateFoilLastSync.empty()
+                ? i18n.tr("settings.home.pf_never", "Never")
+                : screen.m_homeOptions.pirateFoilLastSync;
+        t.items.push_back(std::move(it));
+    }
 
     // --- Hidden games --------------------------------------------------------
     addSection(i18n.tr("settings.home.section_hidden", "Hidden Games"));

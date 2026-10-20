@@ -67,6 +67,10 @@ public:
         bool debugWindow = false;
         bool videoBackgrounds = true;
         int  videoDim = 1;
+        std::string pirateFoilAddress;
+        bool pirateFoilHasKey = false;
+        std::string pirateFoilLastSync;
+        bool pirateFoilSyncing = false;
         bool showDate = false;
         int  dateFormat = 0;         // 0 = month/day/year, 1 = day/month/year
         int  plusAction = 0;         // 0 = quick popup, 1 = full options
