@@ -1996,6 +1996,14 @@ void WiiUMenuApp::activateThemePreset(ThemePreset* preset, bool applyBundledSoun
     m_activeColors = preset->colors;
     m_activeMode = preset->mode;
     m_config.themePreset = m_activePresetName;
+    // A theme can carry its own Home highlight (outline) colour.
+    if (!preset->highlightHex.empty()) {
+        nxui::Color parsed;
+        if (ColorPicker::parseHex(preset->highlightHex, parsed)) {
+            m_config.homeHighlightHex = ColorPicker::toHex(parsed);
+            pushHomeStyleToThemeShop();
+        }
+    }
 
     DebugLog::log("[theme-apply] rebuildThemeFromColors start: preset=%s", presetRef.c_str());
     rebuildThemeFromColors();

@@ -1,0 +1,28 @@
+{
+  "id": "builtin:Jacob",
+  "name": "Jacob",
+  "author": "SwitchU",
+  "version": "1.0.0",
+  "highlight": "#E01B1B",
+  "theme": {
+    "mode": "dark",
+    "colors": {
+      "cursor": [0.0, 0.78, 0.49],
+      "accent": [0.0, 0.78, 0.49],
+      "background": [0.0, 0.3, 0.04],
+      "backgroundAccent": [0.0, 0.45, 0.1],
+      "shapes": [0.0, 0.7, 0.4]
+    },
+    "background": {
+      "opacity": 0.0,
+      "image": {
+        "path": "background.jpg",
+        "opacity": 1.0,
+        "fit": "cover"
+      }
+    }
+  },
+  "audio": {
+    "preset": "jacob"
+  }
+}

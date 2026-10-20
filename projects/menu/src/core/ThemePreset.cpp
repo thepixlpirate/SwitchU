@@ -590,6 +590,10 @@ bool loadThemePresetFromManifest(const std::string& manifestPath,
     readThemeBackground(j, preset.background);
     readThemeFonts(j, preset.fonts);
     readThemeIcons(j, preset.icons);
+    readJsonAliases(j, {"highlight", "highlightColor", "highlight_color", "outlineColor"}, preset.highlightHex);
+    if (themeIt != j.end() && themeIt->is_object())
+        readJsonAliases(*themeIt, {"highlight", "highlightColor", "highlight_color", "outlineColor"},
+                        preset.highlightHex);
     return true;
 }
 
@@ -649,6 +653,7 @@ static std::vector<ThemePreset> makeBuiltInPresets() {
     } defs[] = {
         {"Default Dark", nxui::ThemeMode::Dark},
         {"Default Light", nxui::ThemeMode::Light},
+        {"Jacob", nxui::ThemeMode::Dark},
     };
 
     for (const auto& def : defs) {

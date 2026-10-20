@@ -84,6 +84,8 @@ struct ThemePreset {
     bool            builtIn = true;
     ThemePresetSource source = ThemePresetSource::BuiltIn;
     std::string     soundPreset;
+    // Optional "#RRGGBB": becomes the Home highlight (outline) colour when the theme is applied.
+    std::string     highlightHex;
     std::string     installPath;
 
     nxui::Theme toTheme() const;
