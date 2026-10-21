@@ -4693,6 +4693,16 @@ void WiiUMenuApp::buildGrid() {
 
 std::string WiiUMenuApp::resolveSoundPresetId(const std::string& preset) const {
     std::string effectivePreset = preset;
+    // A sound set shipped with SwitchU itself (switch/SwitchU/sounds/<name>, e.g. the
+    // Jacob theme's music) is allowed when its folder is there.
+    if (!isPackageSoundPreset(effectivePreset) && effectivePreset != kBuiltInSoundPreset
+        && !effectivePreset.empty()
+        && effectivePreset.find('/') == std::string::npos
+        && effectivePreset.find('\\') == std::string::npos
+        && effectivePreset.find("..") == std::string::npos
+        && directoryExists(std::string(SD_ASSETS) + "/sounds/" + effectivePreset)) {
+        return effectivePreset;
+    }
     if (!isPackageSoundPreset(effectivePreset) && effectivePreset != kBuiltInSoundPreset) {
         DebugLog::log("[audio] preset '%s' blocked, using '%s' instead",
                       effectivePreset.c_str(),
